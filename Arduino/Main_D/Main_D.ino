@@ -40,6 +40,26 @@ bool l_value;
 bool r_value;
 bool rr_value;
 
+// TESTED A LITTLE, MORE TESTS
+float distance_from_block (char direction[]){
+    unsigned long duration, distance;
+    // Activate the sensor`
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2); // Just a delay
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10); // Triggers the sensor
+    digitalWrite(trigPin, LOW);
+    if (direction == "front"){
+        duration = pulseIn(echoPinFront, HIGH); // Measure the duration of the pulse
+    }
+    else if (direction == "side"){
+        duration = pulseIn(echoPinSide, HIGH); // Measure the duration of the pulse
+    }
+    distance = (duration / 2) / 29.05;
+    if (distance >= 390){distance=-99;}
+    return distance;
+}
+
 // NEEDS TEST
 void set_motor_speed(int motor, int speed){
     // This function sets the speed of the given driving motor, 0 for left and 1 for right
@@ -107,6 +127,7 @@ void rotate_angle(float angle){
     set_motor_direction(RIGHT_MOT, 0);
 }
 
+// NEED TEST
 void rotate_ccw(){
     set_motor_speed(LEFT_MOT, 250); 
     set_motor_speed(RIGHT_MOT, 250); 
@@ -115,6 +136,7 @@ void rotate_ccw(){
     set_motor_direction(RIGHT_MOT, 1);
 }
 
+// NEED TEST
 void rotate_cw(){
     set_motor_speed(LEFT_MOT, 250); 
     set_motor_speed(RIGHT_MOT, 250); 
@@ -123,7 +145,7 @@ void rotate_cw(){
     set_motor_direction(RIGHT_MOT, -1);
 }
 
-// IN PROGRESS...
+// DONE? NEEDS A LOT OF TEST!!!
 void follow_line(){
     if(ll_value == false && l_value == false && r_value == false && rr_value == false){
         set_motor_speed(LEFT_MOT, 250); 
@@ -195,6 +217,7 @@ int stage_action(int stage){
                 set_motor_direction(RIGHT_MOT, 1);
                 delay(20);
             }
+
 
             if(ll_value == true && l_value == true && r_value == false && rr_value == false){break;}
             follow_line();
