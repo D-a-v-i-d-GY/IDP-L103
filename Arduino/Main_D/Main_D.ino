@@ -2,11 +2,12 @@
 #include <Adafruit_MotorShield.h>
 #include "utility/Adafruit_MS_PWMServoDriver.h"
 
-#define left_ls_pin 13 // Left line sensor pin number
-#define central_ls_pin 12 // Central line sensor pin number
-#define right_ls_pin 11 // Right line sensor pin number
-#define echoPin 8 // Echo Pin for the ultrasonic sensor
-#define trigPin 7 // Trigger Pin for the ultrasonic sensor
+#define ll_pin 13 // Left-most line sensor pin number
+#define l_pin 12 // Left line sensor pin number
+#define r_pin 11 // Right line sensor pin number
+#define rr_pin 8 // Right-most line sensor pin number
+#define echoPin 7 // Echo Pin for the ultrasonic sensor
+#define trigPin 6 // Trigger Pin for the ultrasonic sensor
 
 // IMPORTANT CONSTANTS
 #define delay_per_degree 20.0 // Needs to be measured
@@ -27,10 +28,12 @@ int ljc = 0; // L joint count (as seen from robot's perspective)
 // Variable init
 int motor_speeds[] = {0, 0};
 int motor_directions[] = {0, 0};
-bool left_ls_value;
-bool central_ls_value;
-bool right_ls_value;
+bool ll_value;
+bool l_value;
+bool r_value;
+bool rr_value;
 
+// NEEDS TEST
 void set_motor_speed(int motor, int speed){
     // This function sets the speed of the given driving motor, 0 for left and 1 for right
 
@@ -52,6 +55,7 @@ void set_motor_speed(int motor, int speed){
     }
 }
 
+// NEEDS TEST
 void set_motor_direction(int motor, int direction){
     if (motor = 1 || motor == 0){
         // This function sets the direction of the diving motors assuming straight line motion
@@ -80,6 +84,7 @@ void set_motor_direction(int motor, int direction){
     }
 }
 
+// NEEDS TEST
 void rotate(float angle){
     // This function makes the robot rotate around the center of the wheel axis by the given angle, CCW is assumed positive
 
@@ -95,9 +100,9 @@ void rotate(float angle){
     set_motor_direction(RIGHT_MOT, 0);
 }
 
+// IN PROGRESS...
 void follow_line(){
-    if (!central_ls_value){
-    }
+    
 }
 
 int stage_action(int stage){
@@ -109,7 +114,7 @@ int stage_action(int stage){
             // ==========================================================
             // ask Tim Love if it is better to call a function each time or to write a separate code
 
-            if (left_ls_value && central_ls_value && right_ls_value){tjc++;} // Record the T joint
+            if (ll_value && l_value && r_value && rr_value){tjc++;} // Record the T joint
             if (tjc == 2) {
                 set_motor_direction(LEFT_MOT, 0);
                 set_motor_direction(RIGHT_MOT, 0);
@@ -126,11 +131,6 @@ int stage_action(int stage){
             }
 
             follow_line();
-
-            if ((left_ls_value && central_ls_value) || (right_ls_value && central_ls_value)){
-
-            }
-
     }
   return stage;
 }
@@ -138,6 +138,13 @@ int stage_action(int stage){
 void setup() {
     // test(); // To make initial tests, like run the motors, claw etc.
     // Motor setup
+    pinMode(ll_pin, INPUT);
+    pinMode(l_pin, INPUT);
+    pinMode(r_pin, INPUT);
+    pinMode(rr_pin, INPUT);
+    pinMode(trigPin, OUTPUT);
+    pinMode(echoPin, INPUT);
+
     set_motor_speed(LEFT_MOT, 150); 
     set_motor_speed(RIGHT_MOT, 150); 
     set_motor_direction(LEFT_MOT, -1);
@@ -146,8 +153,9 @@ void setup() {
 }
 
 void loop() {
-    left_ls_value = digitalRead(left_ls_pin);
-    central_ls_value = digitalRead(central_ls_pin);
-    right_ls_value = digitalRead(right_ls_pin);
+    ll_value = digitalRead(ll_pin);
+    l_value = digitalRead(l_pin);
+    r_value = digitalRead(r_pin);
+    rr_value = digitalRead(rr_pin);
     stage = stage_action(stage);
 } 
