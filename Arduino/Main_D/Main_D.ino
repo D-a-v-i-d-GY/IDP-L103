@@ -53,6 +53,7 @@ float velocity(int speed, int direction){
     return 106.4 * speed / 255 * direction;
 }
 
+// NEEDS TEST
 void orientaion_change(){
     if (t0 == 0){
         t0 = millis();
@@ -63,7 +64,7 @@ void orientaion_change(){
 }
 
 // TESTED A LITTLE, MORE TESTS
-float distance_from_block (char direction[]){
+float distance_ultrasonic (char direction[]){
     unsigned long duration;
     float distance;
     // Activate the sensor`
@@ -157,7 +158,7 @@ void rotate_angle(float angle){
     set_motor_direction(RIGHT_MOT, 0);
 }
 
-// NEED TEST
+// NEEDS TEST
 void rotate_ccw(){
     set_motor_speed(LEFT_MOT, 250); 
     set_motor_speed(RIGHT_MOT, 250); 
@@ -166,7 +167,7 @@ void rotate_ccw(){
     set_motor_direction(RIGHT_MOT, 1);
 }
 
-// NEED TEST
+// NEEDS TEST
 void rotate_cw(){
     set_motor_speed(LEFT_MOT, 250); 
     set_motor_speed(RIGHT_MOT, 250); 
@@ -239,7 +240,7 @@ int stage_action(int stage){
                 stage_start = true;
             }
             break;
-        case 1:
+        case 1: // Getting to the tunnel
             if (stage_start){
                 set_motor_speed(LEFT_MOT, 250); 
                 set_motor_speed(RIGHT_MOT, 250); 
@@ -248,9 +249,19 @@ int stage_action(int stage){
                 delay(20);
             }
 
-
+            if (-10 < orientaion < 10){
+                rotate_angle(-orientaion);
+            }
+            if (distance_ultrasonic("side") <= 60){
+                stage++;
+                stage_start=true;
+                break;
+            }
             if(ll_value == true && l_value == true && r_value == false && rr_value == false){break;}
             follow_line();
+            break;
+        case 2: // Going through the tunnel
+            break;
     }
   return stage;
 }
