@@ -5,40 +5,28 @@
 #define left_ls_pin 13; // Left line sensor pin number
 #define central_ls_pin 12; // Central line sensor pin number
 #define right_ls_pin 11; // Right line sensor pin number
-#define echoPin 8;
-#define trigPin 7;
+#define echoPin 8; // Echo Pin for the ultrasonic sensor
+#define trigPin 7; // Trigger Pin for the ultrasonic sensor
 
 // IMPORTANT CONSTANTS
 #define delay_per_degree 20 // Needs to be measured
-#define LEFT_MOT 0
-#define RIGHT_MOT 1
+#define LEFT_MOT 0 // Index of the left motor
+#define RIGHT_MOT 1 // Index of the right motor
 
 // Create motor objects
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *right_motor = AFMS.getMotor(1);
 Adafruit_DCMotor *left_motor = AFMS.getMotor(2);
-Adafruit_DCMotor motors[] = {left_motor, right_motor}
+Adafruit_DCMotor motors[] = {left_motor, right_motor} // Make an array with the mototrs for convenient handling
 
 // Useful flags
-bool going;
-bool block_detected = false;
-bool block_picked_up = false;
-int stage = 0;
+int stage = 0; // Counter that determines the stage of the delivery process, robot's actions are determined by the stage number
 int tjc = 0; // T joint count (as seen from robot's perspective)
 int ljc = 0; // L joint count (as seen from robot's perspective)
 
 // Variable init
-bool turn_right = false;
-bool turn_left = false;
-bool go_straight = false;
-bool in_tunnel = false;
-
-int red_sensor, blue_sensor;
-float robot_width = 20;
-float wall_width = 35;
 int motor_speeds[] = {0, 0}
 int motor_directions[] = {0, 0}
-
 
 
 void set_motor_speed(motor, speed){
@@ -116,10 +104,10 @@ void setup() {
 }
 
 void loop() {
-    stage = stage_action(stage);
     bool left_ls_value = digitalRead(left_ls);
     bool central_ls_value = digitalRead(central_ls);
     bool right_ls_value = digitalRead(right_ls);
+    stage = stage_action(stage);
 } 
 
 int stage_action(stage){
