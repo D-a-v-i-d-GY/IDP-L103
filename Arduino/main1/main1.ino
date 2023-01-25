@@ -20,6 +20,21 @@ bool in_tunnel = false;
 float robot_width = 20;
 float wall_width = 35;
 
+float distance_from_block (void){
+    unsigned long duration, distance;
+    // Activate the sensor
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2); // Just a delay
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10); // Triggers the sensor
+    digitalWrite(trigPin, LOW);
+    duration = pulseIn(echoPin, HIGH); // Measure the duration of the pulse
+    distance = (duration/2) / 29.1;
+    if (distance >= 390){distance=-999;}
+    delay(250);
+    return distance;
+}
+
 void setup() {
 
  Serial.begin(9600);
@@ -35,11 +50,6 @@ void setup() {
  pinMode(echoPin, INPUT);
  Serial.begin(9600);
 
-}
-
-// have a way to read from ultrasound
-float distance_from_block (){
-  
 }
 
 void loop() {
@@ -69,7 +79,8 @@ void loop() {
   }
   else if (in_tunnel) {
     // in tunnel or sommething wrong if in tunnel sound sensor
-  
+  }
+
   int red_sensor = digitalRead(10);
   int blue_sensor = digitalRead(9);
 
@@ -78,25 +89,6 @@ void loop() {
   bool turn_right;
   bool turn_left;
 
-  
-
-
-
-
-  float distance_from_block (void){
-    unsigned long duration, distance;
-    // Activate the sensor
-    digitalWrite(trigPin, LOW);
-    delayMicroseconds(2); // Just a delay
-    digitalWrite(trigPin, HIGH);
-    delayMicroseconds(10); // Triggers the sensor
-    digitalWrite(trigPin, LOW);
-    duration = pulseIn(echoPin, HIGH); // Measure the duration of the pulse
-    distance = (duration/2) / 29.1;
-    if (distance >= 390){distance=-999;}
-    delay(250);
-    return distance;
-  }
 
   wall_distance = distance_from_block();
   if(wall_distance < (wall_width - robot_width + 3) ) {
@@ -124,16 +116,16 @@ void loop() {
       turn_right = true;
     }
     else {
-    
-    
+    // add code
   }
+
   else {
     // assume sensor on the right    
     if(wall_distance < ((tunnel_width - robot_width)/2 - 2) ){
       left_motor->setSpeed(90);
       right_motor->setSpeed(100);
     } 
-    if(  ((tunnel_width - robot_width - wall_distance) < ((tunnel_width - robot_width)/2 - 2)  ){
+    if((tunnel_width - robot_width - wall_distance) < ((tunnel_width - robot_width)/2 - 2)  ){
       left_motor->setSpeed(100);
       right_motor->setSpeed(90);
     }       
@@ -164,8 +156,4 @@ void loop() {
     going == false;
     block_detected == true;
   }
-
-
-  
-  
 }
