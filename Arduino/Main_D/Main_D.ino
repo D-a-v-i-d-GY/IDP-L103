@@ -2,6 +2,8 @@
 #include <Adafruit_MotorShield.h>
 #include "utility/Adafruit_MS_PWMServoDriver.h"
 
+// ALL LENGTHS ARE IN MM!!
+
 #define ll_pin 13 // Left-most line sensor pin number
 #define l_pin 12 // Left line sensor pin number
 #define r_pin 11 // Right line sensor pin number
@@ -20,6 +22,7 @@
 #define llrr 75 // Distance between left-most and right-most sensors
 #define lr 25 // Distance between left and right sensors
 #define line_width 19 // Width of the white line
+#define pi 3.141593
 
 // Create motor objects
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -35,14 +38,34 @@ bool stage_start = true; // Indicator for the start of a new stage
 // Variable init
 int motor_speeds[] = {0, 0};
 int motor_directions[] = {0, 0};
+float orientaion;
 bool ll_value;
 bool l_value;
 bool r_value;
 bool rr_value;
+unsigned long t0 = 0;
+unsigned long t = 0;
+
+// TEST THIS!!!!
+float velocity(int speed, int direction){
+// Return velocity based on the speed of the motor
+// CHECK THIS
+    return 106.4 * speed / 255 * direction;
+}
+
+void orientaion_change(){
+    if (t0 == 0){
+        t0 = millis();
+        return;
+    }
+    t = millis();
+    orientaion += (velocity(motor_speeds[RIGHT_MOT], motor_directions[RIGHT_MOT]) - velocity(motor_speeds[LEFT_MOT], motor_directions[LEFT_MOT])) / wheel_dist * ((t - t0) / 1000) * (180 / pi);
+}
 
 // TESTED A LITTLE, MORE TESTS
 float distance_from_block (char direction[]){
-    unsigned long duration, distance;
+    unsigned long duration;
+    float distance;
     // Activate the sensor`
     digitalWrite(trigPin, LOW);
     delayMicroseconds(2); // Just a delay
@@ -55,8 +78,8 @@ float distance_from_block (char direction[]){
     else if (direction == "side"){
         duration = pulseIn(echoPinSide, HIGH); // Measure the duration of the pulse
     }
-    distance = (duration / 2) / 29.05;
-    if (distance >= 390){distance=-99;}
+    distance = (duration / 2) / 2.905;
+    if (distance >= 3900){distance=-99;}
     return distance;
 }
 
@@ -118,10 +141,17 @@ void rotate_angle(float angle){
     set_motor_speed(LEFT_MOT, 150); 
     set_motor_speed(RIGHT_MOT, 150); 
 
-    set_motor_direction(LEFT_MOT, -1);
-    set_motor_direction(RIGHT_MOT, 1);
+    if (angle > 0){
+        set_motor_direction(LEFT_MOT, -1);
+        set_motor_direction(RIGHT_MOT, 1);
+        delay(angle * delay_per_degree);
+    }
+    else if (angle < 0){
+        set_motor_direction(LEFT_MOT, 1);
+        set_motor_direction(RIGHT_MOT, -1);
+        delay(-angle * delay_per_degree);
+    }
 
-    delay(angle * delay_per_degree);
     
     set_motor_direction(LEFT_MOT, 0);
     set_motor_direction(RIGHT_MOT, 0);
@@ -248,5 +278,7 @@ void loop() {
     l_value = digitalRead(l_pin);
     r_value = digitalRead(r_pin);
     rr_value = digitalRead(rr_pin);
+
+    orientaion_change();
     stage = stage_action(stage);
 } 
