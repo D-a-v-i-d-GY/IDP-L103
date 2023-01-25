@@ -14,13 +14,13 @@ unsigned long duration, distance;
 digitalWrite(trigPin, LOW);
 delayMicroseconds(2); // Just a delay
 digitalWrite(trigPin, HIGH);
-delayMicroseconds(11); // Triggers the sensor
+delayMicroseconds(10); // Triggers the sensor
 digitalWrite(trigPin, LOW);
 
 // Start measuring
 duration = pulseIn(echoPin, HIGH); // Measure the duration of the pulse
 distance = (duration/2) / 29.1;
-if (distance >= 390){distance=-999}
+if (distance >= 390){distance=-999;}
 else{Serial.print(distance);}
 delay(250);
 }

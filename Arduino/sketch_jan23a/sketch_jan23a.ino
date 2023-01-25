@@ -1,26 +1,17 @@
-//pin definition
-#define trigPin 13
-#define echoPin 12
+#include <Wire.h>
+#include <Adafruit_MotorShield.h>
+#include "utility/Adafruit_MS_PWMServoDriver.h"
+
+Adafruit_MotorShield AFMS = Adafruit_MotorShield();
+Adafruit_DCMotor *myMotor = AFMS.getMotor(1);
 
 void setup() {
 Serial.begin (9600);
-pinMode(trigPin, OUTPUT); 
-pinMode(echoPin, INPUT);
+AFMS.begin();
+myMotor->setSpeed(150);
+myMotor->run(FORWARD);
 }
 
 void loop() {
-unsigned long duration, distance;
-// Activate the sensor
-digitalWrite(trigPin, LOW);
-delayMicroseconds(2); // Just a delay
-digitalWrite(trigPin, HIGH);
-delayMicroseconds(11); // Triggers the sensor
-digitalWrite(trigPin, LOW);
-
-// Start measuring
-duration = pulseIn(echoPin, HIGH); // Measure the duration of the pulse
-distance = (duration/2) / 29.1;
-if (distance >= 390){distance=-999}
-else{Serial.print(distance);}
-delay(250);
+  
 }
