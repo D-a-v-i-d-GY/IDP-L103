@@ -193,7 +193,7 @@ int stage_action(int stage){
                 set_motor_speed(RIGHT_MOT, 250); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
-                delay(20)
+                delay(20);
             }
 
             if(ll_value == true && l_value == true && r_value == false && rr_value == false){break;}
@@ -209,8 +209,9 @@ void setup() {
     pinMode(l_pin, INPUT);
     pinMode(r_pin, INPUT);
     pinMode(rr_pin, INPUT);
+    pinMode(echoPinFront, INPUT);
+    pinMode(echoPinSide, INPUT);
     pinMode(trigPin, OUTPUT);
-    pinMode(echoPin, INPUT);
 
     set_motor_speed(LEFT_MOT, 150); 
     set_motor_speed(RIGHT_MOT, 150); 
