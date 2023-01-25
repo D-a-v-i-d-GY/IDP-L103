@@ -6,13 +6,20 @@
 #define l_pin 12 // Left line sensor pin number
 #define r_pin 11 // Right line sensor pin number
 #define rr_pin 8 // Right-most line sensor pin number
-#define echoPin 7 // Echo Pin for the ultrasonic sensor
-#define trigPin 6 // Trigger Pin for the ultrasonic sensor
+#define echoPinFront 7 // Echo Pin for the ultrasonic sensor in the front
+#define echoPinSide 6 // Echo Pin for the ultrasonic sensor on the side
+#define trigPin 5 // Trigger Pin for the ultrasonic sensor
 
-// IMPORTANT CONSTANTS
-#define delay_per_degree 20.0 // Needs to be measured
+// MOTOR INDICIES
 #define LEFT_MOT 0 // Index of the left motor
 #define RIGHT_MOT 1 // Index of the right motor
+
+// GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
+#define delay_per_degree 20.0 // At 150 motor speed (NEED TO MEASURE)
+#define wheel_dist 220 // Distance between the centers of the wheels, NEED TO MEASURE
+#define llrr 75 // Distance between left-most and right-most sensors
+#define lr 25 // Distance between left and right sensors
+#define line_width 19 // Width of the white line
 
 // Create motor objects
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -23,7 +30,7 @@ Adafruit_DCMotor* motors[] = {left_motor, right_motor}; // Make an array with th
 // Useful flags
 int stage = 0; // Counter that determines the stage of the delivery process, robot's actions are determined by the stage number
 int tjc = 0; // T joint count (as seen from robot's perspective)
-int ljc = 0; // L joint count (as seen from robot's perspective)
+bool stage_start = true; // Indicator for the start of a new stage
 
 // Variable init
 int motor_speeds[] = {0, 0};
@@ -85,7 +92,7 @@ void set_motor_direction(int motor, int direction){
 }
 
 // NEEDS TEST
-void rotate(float angle){
+void rotate_angle(float angle){
     // This function makes the robot rotate around the center of the wheel axis by the given angle, CCW is assumed positive
 
     set_motor_speed(LEFT_MOT, 150); 
@@ -100,17 +107,74 @@ void rotate(float angle){
     set_motor_direction(RIGHT_MOT, 0);
 }
 
+void rotate_ccw(){
+    set_motor_speed(LEFT_MOT, 250); 
+    set_motor_speed(RIGHT_MOT, 250); 
+
+    set_motor_direction(LEFT_MOT, -1);
+    set_motor_direction(RIGHT_MOT, 1);
+}
+
+void rotate_cw(){
+    set_motor_speed(LEFT_MOT, 250); 
+    set_motor_speed(RIGHT_MOT, 250); 
+
+    set_motor_direction(LEFT_MOT, 1);
+    set_motor_direction(RIGHT_MOT, -1);
+}
+
 // IN PROGRESS...
 void follow_line(){
-    
+    if(ll_value == false && l_value == false && r_value == false && rr_value == false){
+        set_motor_speed(LEFT_MOT, 250); 
+        set_motor_speed(RIGHT_MOT, 250); 
+        set_motor_direction(LEFT_MOT, 1);
+        set_motor_direction(RIGHT_MOT, 1);
+    }
+
+    else if(ll_value == false && l_value == true && r_value == false && rr_value == false){
+        rotate_ccw();
+    }
+
+    else if(ll_value == false && l_value == false && r_value == true && rr_value == false){
+        rotate_cw();
+    }
+
+    else if(ll_value == true && l_value == false && r_value == false && rr_value == false){
+        rotate_ccw();
+    }
+
+    else if(ll_value == false && l_value == false && r_value == false && rr_value == true){
+        rotate_cw();
+    }
+
+    else if(ll_value == true && l_value == true && r_value == false && rr_value == false){
+        // Left T-junction
+        tjc++;
+        rotate_ccw();
+    }
+
+    else if(ll_value == false && l_value == false && r_value == true && rr_value == true){
+        // Right T-junction
+        tjc++;
+        rotate_cw();
+    }
+
+    else if(ll_value == true && l_value == true && r_value == true && rr_value == true){
+        // T_junction
+        // t_junction_function();
+    }
 }
 
 int stage_action(int stage){
     // ADD for stage shifts, e.g. time based, encoder value based, ultrasonic sensor value based
     switch (stage) {
         case 0: // Getting out of the drop-off/start box
-            set_motor_direction(LEFT_MOT, 1);
-            set_motor_direction(RIGHT_MOT, 1);
+            if (stage_start){
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1);
+                stage_start = false;
+                }
             // ==========================================================
             // ask Tim Love if it is better to call a function each time or to write a separate code
 
@@ -118,18 +182,21 @@ int stage_action(int stage){
             if (tjc == 2) {
                 set_motor_direction(LEFT_MOT, 0);
                 set_motor_direction(RIGHT_MOT, 0);
-                rotate(90);
+                rotate_angle(90);
                 stage++;
+                stage_start = true;
             }
             break;
         case 1:
-            if (motor_directions[LEFT_MOT] != 1 || motor_directions[RIGHT_MOT] != 1){
+            if (stage_start){
                 set_motor_speed(LEFT_MOT, 250); 
                 set_motor_speed(RIGHT_MOT, 250); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
+                delay(20)
             }
 
+            if(ll_value == true && l_value == true && r_value == false && rr_value == false){break;}
             follow_line();
     }
   return stage;
