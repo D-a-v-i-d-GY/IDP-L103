@@ -17,7 +17,7 @@
 #define RIGHT_MOT 1 // Index of the right motor
 
 // GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
-#define delay_per_degree 20.0 // At 150 motor speed (NEED TO MEASURE)
+#define delay_per_degree 12.9 // At 150 motor speed (NEED TO MEASURE)
 #define wheel_dist 220 // Distance between the centers of the wheels, NEED TO MEASURE
 #define llrr 75 // Distance between left-most and right-most sensors
 #define lr 25 // Distance between left and right sensors
@@ -51,7 +51,7 @@ unsigned long t = 0;
 float velocity(int motor){
 // Return velocity based on the speed of the motor
 // CHECK THIS
-    return 106.4 * (motor_speeds[motor] / 255) * motor_directions[motor];
+    return 106.4 * ((float) motor_speeds[motor] / (float) 255) * (float) motor_directions[motor];
 }
 
 // NEEDS TEST
@@ -66,6 +66,9 @@ void orientaion_change(){
     orientation += omega * dt * (180 / pi);
     if (orientation >= 360){
       orientation -= 360;
+    }
+    if (orientation <= -360){
+      orientation += 360;
     }
 }
 
@@ -153,8 +156,9 @@ void set_motor_direction(int motor, int direction){
 void rotate_angle(float angle){
     // This function makes the robot rotate around the center of the wheel axis by the given angle, CCW is assumed positive
 
-    set_motor_speed(LEFT_MOT, 150); 
-    set_motor_speed(RIGHT_MOT, 150); 
+    set_motor_speed(LEFT_MOT, 240); 
+    set_motor_speed(RIGHT_MOT, 240);
+    // 4 seconds for full rotation at 240
 
     if (angle > 0){
         set_motor_direction(LEFT_MOT, -1);
@@ -174,6 +178,7 @@ void rotate_angle(float angle){
 
 // NEEDS TEST
 void rotate_ccw(){
+  Serial.println("Rotating CCW") // DEBUGGING
     set_motor_speed(LEFT_MOT, 250); 
     set_motor_speed(RIGHT_MOT, 250); 
 
@@ -183,6 +188,7 @@ void rotate_ccw(){
 
 // NEEDS TEST
 void rotate_cw(){
+  Serial.println("Rotating CW") // DEBUGGING
     set_motor_speed(LEFT_MOT, 250); 
     set_motor_speed(RIGHT_MOT, 250); 
 
@@ -193,6 +199,7 @@ void rotate_cw(){
 // DONE? NEEDS A LOT OF TEST!!!
 void follow_line(){
     if(ll_value == false && l_value == false && r_value == false && rr_value == false){
+        Serial.println("Moving straight") // DEBUGGING
         set_motor_speed(LEFT_MOT, 250); 
         set_motor_speed(RIGHT_MOT, 250); 
         set_motor_direction(LEFT_MOT, 1);
@@ -217,12 +224,14 @@ void follow_line(){
 
     else if(ll_value == true && l_value == true && r_value == false && rr_value == false){
         // Left T-junction
+        Serial.println("LEFT T-Junction DETECTED") // DEBUGGING
         tjc++;
         rotate_ccw();
     }
 
     else if(ll_value == false && l_value == false && r_value == true && rr_value == true){
         // Right T-junction
+        Serial.println("RIGHT T-Junction DETECTED") // DEBUGGING
         tjc++;
         rotate_cw();
     }
@@ -295,11 +304,11 @@ void setup() {
     pinMode(echoPinSide, INPUT);
     pinMode(trigPin, OUTPUT);
 
-    set_motor_speed(LEFT_MOT, 250); 
-    set_motor_speed(RIGHT_MOT, 250); 
+    set_motor_speed(LEFT_MOT, 240); 
+    set_motor_speed(RIGHT_MOT, 240); 
     set_motor_direction(LEFT_MOT, 0);
     set_motor_direction(RIGHT_MOT, 0);
-    // delay(3000);
+    delay(3000);
 }
 
 void loop() {
@@ -309,7 +318,15 @@ void loop() {
     // r_value = digitalRead(r_pin);
     // rr_value = digitalRead(rr_pin);
 
-    orientaion_change();
-    Serial.println(orientation);
+    rotate_angle(90);
+    delay(500);
+    
+    rotate_angle(90);
+    delay(500);
+    rotate_angle(90);
+    delay(500);
+    rotate_angle(90);
+    delay(500);
+    // follow_line();
     // stage = stage_action(stage);
 } 
