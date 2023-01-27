@@ -38,7 +38,8 @@ bool stage_start = true; // Indicator for the start of a new stage
 // Variable init
 int motor_speeds[] = {0, 0};
 int motor_directions[] = {0, 0};
-float orientaion;
+float motor_velocities[] = {0.0, 0.0};
+float orientation;
 bool ll_value;
 bool l_value;
 bool r_value;
@@ -47,10 +48,10 @@ unsigned long t0 = 0;
 unsigned long t = 0;
 
 // TEST THIS!!!!
-float velocity(int speed, int direction){
+float velocity(int motor){
 // Return velocity based on the speed of the motor
 // CHECK THIS
-    return 106.4 * speed / 255 * direction;
+    return 106.4 * (motor_speeds[motor] / 255) * motor_directions[motor];
 }
 
 // NEEDS TEST
@@ -60,7 +61,12 @@ void orientaion_change(){
         return;
     }
     t = millis();
-    orientaion += (velocity(motor_speeds[RIGHT_MOT], motor_directions[RIGHT_MOT]) - velocity(motor_speeds[LEFT_MOT], motor_directions[LEFT_MOT])) / wheel_dist * ((t - t0) / 1000) * (180 / pi);
+    float dt = (t - t0) / 1000;
+    float omega = (velocity(RIGHT_MOT) - velocity(LEFT_MOT)) / wheel_dist;
+    orientation += omega * dt * (180 / pi);
+    if (orientation >= 360){
+      orientation -= 360;
+    }
 }
 
 // TESTED A LITTLE, MORE TESTS
@@ -84,7 +90,7 @@ float distance_ultrasonic (char direction[]){
     return distance;
 }
 
-// NEEDS TEST
+// TESTED
 void set_motor_speed(int motor, int speed){
     // This function sets the speed of the given driving motor, 0 for left and 1 for right
 
@@ -97,7 +103,7 @@ void set_motor_speed(int motor, int speed){
     if (motor == 1 || motor == 0){
         // Don't change the speed if it is the same 
         if (motors[motor] != speed){
-            motors[motor]->setSpeed(speed); motor_speeds[motor] = speed;
+            motors[motor]->setSpeed(speed); motor_speeds[motor] = speed; motor_velocities[motor] = velocity(motor);
             Serial.println("Speed Set!"); // For debugging
         }
     }
@@ -135,7 +141,7 @@ void set_motor_direction(int motor, int direction){
           Serial.println("Direction is already set"); // For debugging
         }
 
-        motor_directions[motor] = direction;
+        motor_directions[motor] = direction; motor_velocities[motor] = velocity(motor);
     }
     else{
         Serial.println(motor); // For debugging
@@ -143,7 +149,7 @@ void set_motor_direction(int motor, int direction){
     }
 }
 
-// TESTED
+// NEEDS TEST
 void rotate_angle(float angle){
     // This function makes the robot rotate around the center of the wheel axis by the given angle, CCW is assumed positive
 
@@ -259,8 +265,8 @@ int stage_action(int stage){
                 delay(20);
             }
 
-            if (-10 < orientaion < 10){
-                rotate_angle(-orientaion);
+            if (-10 < orientation < 10){
+                rotate_angle(-orientation);
             }
             if (distance_ultrasonic("side") <= 60){
                 stage++;
@@ -289,19 +295,21 @@ void setup() {
     pinMode(echoPinSide, INPUT);
     pinMode(trigPin, OUTPUT);
 
-    set_motor_speed(LEFT_MOT, 150); 
-    set_motor_speed(RIGHT_MOT, 150); 
-    set_motor_direction(LEFT_MOT, -1);
-    set_motor_direction(RIGHT_MOT, -1);
-    delay(3000);
+    set_motor_speed(LEFT_MOT, 250); 
+    set_motor_speed(RIGHT_MOT, 250); 
+    set_motor_direction(LEFT_MOT, 0);
+    set_motor_direction(RIGHT_MOT, 0);
+    // delay(3000);
 }
 
 void loop() {
-    ll_value = digitalRead(ll_pin);
-    l_value = digitalRead(l_pin);
-    r_value = digitalRead(r_pin);
-    rr_value = digitalRead(rr_pin);
+  // MODIFY THIS CODE AFTER TESTS
+    // ll_value = digitalRead(ll_pin);
+    // l_value = digitalRead(l_pin);
+    // r_value = digitalRead(r_pin);
+    // rr_value = digitalRead(rr_pin);
 
     orientaion_change();
-    stage = stage_action(stage);
+    Serial.println(orientation);
+    // stage = stage_action(stage);
 } 
