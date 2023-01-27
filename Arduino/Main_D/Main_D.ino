@@ -91,51 +91,59 @@ void set_motor_speed(int motor, int speed){
     // test that the speed value is in the right 
     if (speed < 0 || speed > 255){
       return;
-        Serial.println("Speed out of range");
+        Serial.println("Speed out of range"); // For debugging
     }
 
-    if (motor = 1 || motor == 0){
+    if (motor == 1 || motor == 0){
         // Don't change the speed if it is the same 
         if (motors[motor] != speed){
             motors[motor]->setSpeed(speed); motor_speeds[motor] = speed;
+            Serial.println("Speed Set!"); // For debugging
         }
     }
 
     else{
-        Serial.println("motor should be either 0 or 1");
+        Serial.println("motor should be either 0 or 1"); // For debugging
     }
 }
 
-// NEEDS TEST
+// TESTED
 void set_motor_direction(int motor, int direction){
-    if (motor = 1 || motor == 0){
+    if (motor == 1 || motor == 0){
         // This function sets the direction of the diving motors assuming straight line motion
         if (motor_directions[motor] != direction){
             // Assign the correct direction for the motors
             if (direction == 1){
                 motors[motor]->run(FORWARD);
+                Serial.println("Direction Set!"); // For debugging
             }
             else if (direction == 0){
                 motors[motor]->run(RELEASE);
+                Serial.println("Direction Set!"); // For debugging
             }
             else if (direction == -1){
                 motors[motor]->run(BACKWARD);
+                Serial.println("Direction Set!"); // For debugging
             }
             else { 
                 // Check for correct direction assignment
-                Serial.println("Direction not defined");
+                Serial.println("Direction not defined"); // For debugging
                 return;
             }
         }
-    else{
-        Serial.println("motor should be either 0 or 1");
-    }
+        else{
+          Serial.println("Direction is already set"); // For debugging
+        }
 
         motor_directions[motor] = direction;
     }
+    else{
+        Serial.println(motor); // For debugging
+        Serial.println("motor should be either 0 or 1");
+    }
 }
 
-// NEEDS TEST
+// TESTED
 void rotate_angle(float angle){
     // This function makes the robot rotate around the center of the wheel axis by the given angle, CCW is assumed positive
 
@@ -220,6 +228,8 @@ void follow_line(){
 }
 
 int stage_action(int stage){
+  Serial.print("Current Stage: ");
+  Serial.println(stage);
     // ADD for stage shifts, e.g. time based, encoder value based, ultrasonic sensor value based
     switch (stage) {
         case 0: // Getting out of the drop-off/start box
@@ -269,6 +279,8 @@ int stage_action(int stage){
 void setup() {
     // test(); // To make initial tests, like run the motors, claw etc.
     // Motor setup
+    Serial.begin(9600);
+    AFMS.begin();
     pinMode(ll_pin, INPUT);
     pinMode(l_pin, INPUT);
     pinMode(r_pin, INPUT);
