@@ -44,6 +44,10 @@ bool ll_value;
 bool l_value;
 bool r_value;
 bool rr_value;
+bool l_up = false; // flag to check if left sensor is on 
+bool r_up = false; // flag to check if right sensor is on 
+unsigned long t_l = 0; // to measure the up-time of the left sensor
+unsigned long t_r = 0; // to measure the up-time of the right sensor
 unsigned long t0 = 0;
 unsigned long t = 0;
 
@@ -194,7 +198,17 @@ void rotate_cw(int speed){
 
 // DONE? NEEDS A LOT OF TEST!!!
 void follow_line(int forward_speed, int rotation_speed){
-    if(ll_value == false && l_value == false && r_value == false && rr_value == false){
+    // Algorithm for following the line
+
+    // If any of the line-following sensors were on for too long then that sensor cannot go off the line, ignore that sensor's reading
+    if (millis() - t_l >= 500 && l_up){ // TEST THE up-time MINIMUM
+        if (r_value){l_value = false;} // Force the reading of the sensor to zero
+    }
+    else if (millis() - t_r >= 500 && r_up){ // TEST THE up-time MINIMUM
+        if (l_value){r_value = false;} // Force the reading of the sensor to zero
+    }
+
+    if(ll_value == false && l_value == false && r_value == false && rr_value == false){ // 0000
         Serial.println("Moving straight");// DEBUGGING
         set_motor_speed(LEFT_MOT, forward_speed); 
         set_motor_speed(RIGHT_MOT, forward_speed); 
@@ -202,39 +216,40 @@ void follow_line(int forward_speed, int rotation_speed){
         set_motor_direction(RIGHT_MOT, 1);
     }
 
-    else if(ll_value == false && l_value == true && r_value == false && rr_value == false){
+    else if(ll_value == false && l_value == true && r_value == false && rr_value == false){ // 0100
         rotate_ccw(rotation_speed);
     }
 
-    else if(ll_value == false && l_value == false && r_value == true && rr_value == false){
+    else if(ll_value == false && l_value == false && r_value == true && rr_value == false){ // 0010
         rotate_cw(rotation_speed);
     }
 
-    else if(ll_value == true && l_value == false && r_value == false && rr_value == false){
+    else if(ll_value == true && l_value == false && r_value == false && rr_value == false){ // 1000
         rotate_ccw(rotation_speed);
     }
 
-    else if(ll_value == false && l_value == false && r_value == false && rr_value == true){
+    else if(ll_value == false && l_value == false && r_value == false && rr_value == true){ // 0001
         rotate_cw(rotation_speed);
     }
 
-    else if(ll_value == true && l_value == true && r_value == false && rr_value == false){
+    else if(ll_value == true && l_value == true && r_value == false && rr_value == false){ // 1100
         // Left T-junction
         Serial.println("LEFT T-Junction DETECTED"); // DEBUGGING
         tjc++;
         rotate_ccw(rotation_speed);
     }
 
-    else if(ll_value == false && l_value == false && r_value == true && rr_value == true){
+    else if(ll_value == false && l_value == false && r_value == true && rr_value == true){ // 0011
         // Right T-junction
         Serial.println("RIGHT T-Junction DETECTED"); // DEBUGGING
         tjc++;
         rotate_cw(rotation_speed);
     }
 
-    else if(ll_value == true && l_value == true && r_value == true && rr_value == true){
+    else if(ll_value == true && l_value == true && r_value == true && rr_value == true){ // 1111
         // T_junction
         // t_junction_function();
+        tjc++;
     }
 }
 
@@ -243,45 +258,92 @@ int stage_action(int stage){
   Serial.println(stage);
     // ADD for stage shifts, e.g. time based, encoder value based, ultrasonic sensor value based
     switch (stage) {
-        case 0: // Getting out of the drop-off/start box
+        case 0: // Getting out of the drop-off/start box || TEST
             if (stage_start){
+                // Start going forward
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 stage_start = false;
                 }
             // ==========================================================
 
-            if (ll_value && l_value && r_value && rr_value){tjc++;} // Record the T joint
+            if (ll_value && l_value && r_value && rr_value){tjc++;} // Record the T-junction
             if (tjc == 2) {
+                // Stop
                 set_motor_direction(LEFT_MOT, 0);
                 set_motor_direction(RIGHT_MOT, 0);
-                rotate_ccw();
+                // Start rotating
+                rotate_ccw(150);
+                // wait untill the ll sensor sees the starting box line
+                while (!ll_value){
+                    // Do nothing
+                }
+                // Stop and go to the next stage
+                set_motor_direction(LEFT_MOT, 0);
+                set_motor_direction(RIGHT_MOT, 0);
                 stage++;
                 stage_start = true;
             }
             break;
-        case 1: // Getting to the tunnel
+        case 1: // Getting to the tunnel || TEST
             if (stage_start){
-                set_motor_speed(LEFT_MOT, 250); 
-                set_motor_speed(RIGHT_MOT, 250); 
+                // Start moving forward
+                set_motor_speed(LEFT_MOT, 170); 
+                set_motor_speed(RIGHT_MOT, 170); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
-                delay(20);
+                delay(60); // to get off the initial line that connects start box to the main loop || TEST THE DELAY
+                stage_start = false;
             }
 
-            if (-10 < orientation < 10){
-                rotate_angle(-orientation);
-            }
-            if (distance_ultrasonic("side") <= 60){
+            if (distance_ultrasonic(echoPinSide) <= 60){ // TEST THE DISTANCE
+                // Ultrasonic sensor sees the wall of the tunnel, change the stage
                 stage++;
                 stage_start=true;
                 break;
             }
-            if(ll_value == true && l_value == true && r_value == false && rr_value == false){break;}
-            follow_line();
+            
+            if(ll_value == true){tjc++; delay(60); break;} // Avoid T-junction at the green drop-off || TEST THE DELAY
+            follow_line(170, 150); // TEST THE SPEED
             break;
         case 2: // Going through the tunnel
+            if (stage_start){
+                // Start moving forward
+                set_motor_speed(LEFT_MOT, 170); 
+                set_motor_speed(RIGHT_MOT, 170); 
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1);
+                stage_start = false;
+            }
+
+            if (distance_ultrasonic(echoPinSide) > 60){ // TEST THE DISTANCE
+                // Ultrasonic sensor does not see the wall of the tunnel anymore, change the stage
+                stage++;
+                stage_start=true;
+                break;
+            }
+            // Maybe add an additional check for the distance from the front wall
             break;
+        case 3: // Locating the block and getting close to it
+            if (stage_start){
+                // Start actions?
+                stage_start = false;
+            }
+
+            if (distance_ultrasonic(echoPinSide) < 150){ // TEST THE DISTANCE AND CLEARANCE FROM OTHER OBJECTS
+                // Block located
+                // Stop
+                set_motor_direction(LEFT_MOT, 0);
+                set_motor_direction(RIGHT_MOT, 0);
+                stage++;
+                stage_start=true;
+                break;
+            }
+
+            follow_line(170, 150);
+
+            break;
+    
     }
   return stage;
 }
@@ -308,10 +370,15 @@ void setup() {
 
 void loop() {
   // MODIFY THIS CODE AFTER TESTS
-    // ll_value = digitalRead(ll_pin);
-    // l_value = digitalRead(l_pin);
-    // r_value = digitalRead(r_pin);
-    // rr_value = digitalRead(rr_pin);
+    ll_value = digitalRead(ll_pin);
+    l_value = digitalRead(l_pin);
+    r_value = digitalRead(r_pin);
+    rr_value = digitalRead(rr_pin);
+    if (l_value && !l_up){t_l = millis(); l_up = true;} 
+    if (r_value && !r_up){t_r = millis(); r_up = true;} 
+    if (!l_value){l_up = false;}
+    if (!r_value){r_up = false;} 
+    
 
     // follow_line();
     // stage = stage_action(stage);
