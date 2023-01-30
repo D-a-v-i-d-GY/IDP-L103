@@ -46,10 +46,16 @@ bool r_value;
 bool rr_value;
 bool l_up = false; // flag to check if left sensor is on 
 bool r_up = false; // flag to check if right sensor is on 
+bool block_picked_up = false;
+bool block_detected = false;
 unsigned long t_l = 0; // to measure the up-time of the left sensor
 unsigned long t_r = 0; // to measure the up-time of the right sensor
+unsigned long t_tjc = 0;
 unsigned long t0 = 0;
-unsigned long t = 0;
+
+void tjCounter(){
+    if (millis() - t_tjc > 100){tjc++; t_tjc = millis();}
+}
 
 // TEST THIS!!!! (TRY NOT TO USE!!!)
 float velocity(int motor){
@@ -64,8 +70,7 @@ void orientaion_change(){
         t0 = millis();
         return;
     }
-    t = millis();
-    float dt = (t - t0) / 1000;
+    float dt = (millis() - t0) / 1000;
     float omega = (velocity(RIGHT_MOT) - velocity(LEFT_MOT)) / wheel_dist;
     orientation += omega * dt * (180 / pi);
     if (orientation >= 360){
@@ -203,9 +208,11 @@ void follow_line(int forward_speed, int rotation_speed){
     // If any of the line-following sensors were on for too long then that sensor cannot go off the line, ignore that sensor's reading
     if (millis() - t_l >= 500 && l_up){ // TEST THE up-time MINIMUM
         if (r_value){l_value = false;} // Force the reading of the sensor to zero
+        Serial.println("Left sensor is stuck!");// DEBUGGING
     }
     else if (millis() - t_r >= 500 && r_up){ // TEST THE up-time MINIMUM
         if (l_value){r_value = false;} // Force the reading of the sensor to zero
+        Serial.println("Right sensor is stuck!");// DEBUGGING
     }
 
     if(ll_value == false && l_value == false && r_value == false && rr_value == false){ // 0000
@@ -224,6 +231,7 @@ void follow_line(int forward_speed, int rotation_speed){
         rotate_cw(rotation_speed);
     }
 
+    // MODIFY THE CODE BELOW
     else if(ll_value == true && l_value == false && r_value == false && rr_value == false){ // 1000
         rotate_ccw(rotation_speed);
     }
@@ -235,21 +243,21 @@ void follow_line(int forward_speed, int rotation_speed){
     else if(ll_value == true && l_value == true && r_value == false && rr_value == false){ // 1100
         // Left T-junction
         Serial.println("LEFT T-Junction DETECTED"); // DEBUGGING
-        tjc++;
+        tjCounter();
         rotate_ccw(rotation_speed);
     }
 
     else if(ll_value == false && l_value == false && r_value == true && rr_value == true){ // 0011
         // Right T-junction
         Serial.println("RIGHT T-Junction DETECTED"); // DEBUGGING
-        tjc++;
+        tjCounter();
         rotate_cw(rotation_speed);
     }
 
     else if(ll_value == true && l_value == true && r_value == true && rr_value == true){ // 1111
         // T_junction
         // t_junction_function();
-        tjc++;
+        tjCounter();
     }
 }
 
@@ -267,7 +275,7 @@ int stage_action(int stage){
                 }
             // ==========================================================
 
-            if (ll_value && l_value && r_value && rr_value){tjc++;} // Record the T-junction
+            if (ll_value && l_value && r_value && rr_value){tjCounter();} // Record the T-junction
             if (tjc == 2) {
                 // Stop
                 set_motor_direction(LEFT_MOT, 0);
@@ -281,7 +289,7 @@ int stage_action(int stage){
                 // Stop and go to the next stage
                 set_motor_direction(LEFT_MOT, 0);
                 set_motor_direction(RIGHT_MOT, 0);
-                stage++;
+                stage = 1;
                 stage_start = true;
             }
             break;
@@ -298,12 +306,12 @@ int stage_action(int stage){
 
             if (distance_ultrasonic(echoPinSide) <= 60){ // TEST THE DISTANCE
                 // Ultrasonic sensor sees the wall of the tunnel, change the stage
-                stage++;
+                stage = 2;
                 stage_start=true;
                 break;
             }
             
-            if(ll_value == true){tjc++; delay(60); break;} // Avoid T-junction at the green drop-off || TEST THE DELAY
+            if(ll_value == true){tjCounter(); delay(60); break;} // Avoid T-junction at the green drop-off || TEST THE DELAY
             follow_line(170, 150); // TEST THE SPEED
             break;
         case 2: // Going through the tunnel
@@ -318,7 +326,7 @@ int stage_action(int stage){
 
             if (distance_ultrasonic(echoPinSide) > 60){ // TEST THE DISTANCE
                 // Ultrasonic sensor does not see the wall of the tunnel anymore, change the stage
-                stage++;
+                stage = 3;
                 stage_start=true;
                 break;
             }
@@ -326,18 +334,39 @@ int stage_action(int stage){
             break;
         case 3: // Locating the block and getting close to it
             if (stage_start){
-                // Start actions?
+                // Some kind of wiggly motion to find the line?
                 stage_start = false;
             }
-
-            if (distance_ultrasonic(echoPinSide) < 150){ // TEST THE DISTANCE AND CLEARANCE FROM OTHER OBJECTS
-                // Block located
-                // Stop
-                set_motor_direction(LEFT_MOT, 0);
-                set_motor_direction(RIGHT_MOT, 0);
-                stage++;
-                stage_start=true;
-                break;
+            
+            if (tjc == 4){
+                if (distance_ultrasonic(echoPinFront) < 150){ // TEST THE DISTANCE AND CLEARANCE FROM OTHER OBJECTS
+                    // Block located
+                    // Stop
+                    set_motor_direction(LEFT_MOT, 0);
+                    set_motor_direction(RIGHT_MOT, 0);
+                    stage = 42;
+                    stage_start=true;
+                    break;
+                }
+            }
+        
+            if (rr_value){
+                tjCounter();
+                if (distance_ultrasonic(echoPinSide) < 150){ // TEST THE DISTANCE AND CLEARANCE FROM OTHER OBJECTS
+                    // Block located and the robot is at the right position
+                    // Stop
+                    set_motor_direction(LEFT_MOT, 0);
+                    set_motor_direction(RIGHT_MOT, 0);
+                    if (tjc == 4){stage = 41}
+                    else if (tjc == 6){stage = 43}
+                    stage_start=true;
+                    break;
+                }
+                else{
+                    // An empty junction is reached, wait untill the sensor goes off the line and continue.
+                    delay(60);
+                    break;
+                }
             }
 
             follow_line(170, 150);
@@ -345,7 +374,6 @@ int stage_action(int stage){
             break;
     
     }
-  return stage;
 }
 
 void setup() {
@@ -381,5 +409,5 @@ void loop() {
     
 
     // follow_line();
-    // stage = stage_action(stage);
+    // stage_action(stage);
 } 
