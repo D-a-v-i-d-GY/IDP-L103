@@ -18,6 +18,9 @@
 
 // GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
 #define delay_per_degree 12.9 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
+#define stagnation_time 500 // Time allowed for a line sensor to be continuously active || TEST
+#define tj_detection_interval 100 // Minimum time difference between consecutive detection of t-jucntions || TEST
+#define line_crossing_delay 60 // Minimum time delay that ensures that the line sensor goes through the line without getting activated || TEST
 #define wheel_dist 220 // Distance between the centers of the wheels, NEED TO MEASURE
 #define llrr 75 // Distance between left-most and right-most sensors, NEED TO VERIFY
 #define lr 25 // Distance between left and right sensors, NEED TO VERIFY
@@ -54,7 +57,9 @@ unsigned long t_tjc = 0;
 unsigned long t0 = 0;
 
 void tjCounter(){
-    if (millis() - t_tjc > 100){tjc++; t_tjc = millis();}
+    // Counter of T-junctions, with protection against excessive counting
+    if (millis() - t_tjc > tj_detection_interval){tjc++; t_tjc = millis();}
+    Serial.println("T junction encountered!"); // DEBUGGING
 }
 
 // TEST THIS!!!! (TRY NOT TO USE!!!)
@@ -113,7 +118,7 @@ void set_motor_speed(int motor, int speed){
             motors[motor]->setSpeed(speed); motor_speeds[motor] = speed; motor_velocities[motor] = velocity(motor);
             Serial.println("Speed set!"); // For debugging
         }
-        else{Serial.println("Speed is already set!")}; // For debugging}
+        else{Serial.println("Speed is already set!");}; // For debugging}
     }
 
     else{
@@ -206,11 +211,11 @@ void follow_line(int forward_speed, int rotation_speed){
     // Algorithm for following the line
 
     // If any of the line-following sensors were on for too long then that sensor cannot go off the line, ignore that sensor's reading
-    if (millis() - t_l >= 500 && l_up){ // TEST THE up-time MINIMUM
+    if (millis() - t_l >= stagnation_time && l_up){ // TEST THE up-time MINIMUM
         if (r_value){l_value = false;} // Force the reading of the sensor to zero
         Serial.println("Left sensor is stuck!");// DEBUGGING
     }
-    else if (millis() - t_r >= 500 && r_up){ // TEST THE up-time MINIMUM
+    else if (millis() - t_r >= stagnation_time && r_up){ // TEST THE up-time MINIMUM
         if (l_value){r_value = false;} // Force the reading of the sensor to zero
         Serial.println("Right sensor is stuck!");// DEBUGGING
     }
@@ -262,8 +267,8 @@ void follow_line(int forward_speed, int rotation_speed){
 }
 
 int stage_action(int stage){
-  Serial.print("Current Stage: ");
-  Serial.println(stage);
+  Serial.print("Current Stage: "); // DEBUGGING
+  Serial.println(stage); // DEBUGGING
     // ADD for stage shifts, e.g. time based, encoder value based, ultrasonic sensor value based
     switch (stage) {
         case 0: // Getting out of the drop-off/start box || TEST
@@ -272,11 +277,13 @@ int stage_action(int stage){
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 stage_start = false;
+                Serial.println("Start"); // DEBUGGING
                 }
             // ==========================================================
 
             if (ll_value && l_value && r_value && rr_value){tjCounter();} // Record the T-junction
             if (tjc == 2) {
+                Serial.println("Reached the main loop"); // DEBUGGING
                 // Stop
                 set_motor_direction(LEFT_MOT, 0);
                 set_motor_direction(RIGHT_MOT, 0);
@@ -300,18 +307,22 @@ int stage_action(int stage){
                 set_motor_speed(RIGHT_MOT, 170); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
-                delay(60); // to get off the initial line that connects start box to the main loop || TEST THE DELAY
+                delay(line_crossing_delay); // to get off the initial line that connects start box to the main loop || TEST THE DELAY
                 stage_start = false;
+                Serial.println("Start"); // DEBUGGING
             }
 
             if (distance_ultrasonic(echoPinSide) <= 60){ // TEST THE DISTANCE
                 // Ultrasonic sensor sees the wall of the tunnel, change the stage
+                Serial.println("Reached the tunnel"); // DEBUGGING
                 stage = 2;
                 stage_start=true;
                 break;
             }
             
-            if(ll_value == true){tjCounter(); delay(60); break;} // Avoid T-junction at the green drop-off || TEST THE DELAY
+            // Ignoring the drop-off junction 
+            if(ll_value == true){tjCounter(); break;} // Avoid T-junction at the green drop-off || TEST
+            
             follow_line(170, 150); // TEST THE SPEED
             break;
         case 2: // Going through the tunnel
@@ -322,10 +333,12 @@ int stage_action(int stage){
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 stage_start = false;
+                Serial.println("Start"); // DEBUGGING
             }
 
             if (distance_ultrasonic(echoPinSide) > 60){ // TEST THE DISTANCE
                 // Ultrasonic sensor does not see the wall of the tunnel anymore, change the stage
+                Serial.println("Out of the tunnel"); // DEBUGGING
                 stage = 3;
                 stage_start=true;
                 break;
@@ -336,15 +349,17 @@ int stage_action(int stage){
             if (stage_start){
                 // Some kind of wiggly motion to find the line?
                 stage_start = false;
+                Serial.println("Start"); // DEBUGGING
             }
             
             if (tjc == 4){
                 if (distance_ultrasonic(echoPinFront) < 150){ // TEST THE DISTANCE AND CLEARANCE FROM OTHER OBJECTS
+                    Serial.println("Block located at the second location"); // DEBUGGING
                     // Block located
                     // Stop
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
-                    stage = 42;
+                    stage = 42; // block located at the second pick-up location
                     stage_start=true;
                     break;
                 }
@@ -357,14 +372,15 @@ int stage_action(int stage){
                     // Stop
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
-                    if (tjc == 4){stage = 41}
-                    else if (tjc == 6){stage = 43}
+                    if (tjc == 4){stage = 41; Serial.println("Block located at the first location");} // DEBUGGING // block located at the first pick-up location
+                    else if (tjc == 6){stage = 43; Serial.println("Block located at the first location");} // DEBUGGING // block located at the third pick-up location
                     stage_start=true;
                     break;
                 }
                 else{
                     // An empty junction is reached, wait untill the sensor goes off the line and continue.
-                    delay(60);
+                    Serial.println("Skipping the junction");
+                    delay(line_crossing_delay);
                     break;
                 }
             }
@@ -372,7 +388,28 @@ int stage_action(int stage){
             follow_line(170, 150);
 
             break;
-    
+        case 41: // First pick-up location. Picking up the block and getting outside the pick-up zone
+            if (stage_start){
+                // Some kind of wiggly motion to find the line?
+                stage_start = false;
+                Serial.println("Start"); // DEBUGGING
+                rotate_cw(100);
+            }
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+           
+            if (distance_ultrasonic(echoPinFront) < 150){
+
+            }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////            
+            break;
+        case 42: // Second pick-up location. Picking up the block and getting outside the pick-up zone
+        
+            break;
+        case 43: // Third pick-up location. Picking up the block and getting outside the pick-up zone
+        
+            break;
+
     }
 }
 
