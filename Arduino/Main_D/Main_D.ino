@@ -17,11 +17,11 @@
 #define RIGHT_MOT 1 // Index of the right motor
 
 // GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
-#define delay_per_degree 12.9 // At 150 motor speed (NEED TO MEASURE)
+#define delay_per_degree 12.9 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
 #define wheel_dist 220 // Distance between the centers of the wheels, NEED TO MEASURE
-#define llrr 75 // Distance between left-most and right-most sensors
-#define lr 25 // Distance between left and right sensors
-#define line_width 19 // Width of the white line
+#define llrr 75 // Distance between left-most and right-most sensors, NEED TO VERIFY
+#define lr 25 // Distance between left and right sensors, NEED TO VERIFY
+#define line_width 19 // Width of the white line, NEED TO VERIFY
 #define pi 3.141593
 
 // Create motor objects
@@ -47,14 +47,14 @@ bool rr_value;
 unsigned long t0 = 0;
 unsigned long t = 0;
 
-// TEST THIS!!!!
+// TEST THIS!!!! (TRY NOT TO USE!!!)
 float velocity(int motor){
-// Return velocity based on the speed of the motor
-// CHECK THIS
+    // Return velocity based on the speed of the motor
+    // CHECK THIS
     return 106.4 * ((float) motor_speeds[motor] / (float) 255) * (float) motor_directions[motor];
 }
 
-// NEEDS TEST
+// NEEDS TEST (TRY NOT TO USE!!!)
 void orientaion_change(){
     if (t0 == 0){
         t0 = millis();
@@ -73,7 +73,7 @@ void orientaion_change(){
 }
 
 // TESTED A LITTLE, MORE TESTS
-float distance_ultrasonic (char direction[]){
+float distance_ultrasonic (int pinNumber){
     unsigned long duration;
     float distance;
     // Activate the sensor`
@@ -82,12 +82,7 @@ float distance_ultrasonic (char direction[]){
     digitalWrite(trigPin, HIGH);
     delayMicroseconds(10); // Triggers the sensor
     digitalWrite(trigPin, LOW);
-    if (direction == "front"){
-        duration = pulseIn(echoPinFront, HIGH); // Measure the duration of the pulse
-    }
-    else if (direction == "side"){
-        duration = pulseIn(echoPinSide, HIGH); // Measure the duration of the pulse
-    }
+    duration = pulseIn(pinNumber, HIGH); // Measure the duration of the pulse
     distance = (duration / 2) / 2.905;
     if (distance >= 3900){distance=-99;}
     return distance;
@@ -105,10 +100,11 @@ void set_motor_speed(int motor, int speed){
 
     if (motor == 1 || motor == 0){
         // Don't change the speed if it is the same 
-        if (motors[motor] != speed){
+        if (motor_speeds[motor] != speed){
             motors[motor]->setSpeed(speed); motor_speeds[motor] = speed; motor_velocities[motor] = velocity(motor);
-            Serial.println("Speed Set!"); // For debugging
+            Serial.println("Speed set!"); // For debugging
         }
+        else{Serial.println("Speed is already set!")}; // For debugging}
     }
 
     else{
@@ -152,7 +148,7 @@ void set_motor_direction(int motor, int direction){
     }
 }
 
-// NEEDS TEST
+// NEEDS TEST (TRY NOT TO USE!!!)
 void rotate_angle(float angle){
     // This function makes the robot rotate around the center of the wheel axis by the given angle, CCW is assumed positive
 
@@ -177,63 +173,63 @@ void rotate_angle(float angle){
 }
 
 // NEEDS TEST
-void rotate_ccw(){
-  Serial.println("Rotating CCW") // DEBUGGING
-    set_motor_speed(LEFT_MOT, 250); 
-    set_motor_speed(RIGHT_MOT, 250); 
+void rotate_ccw(int speed){
+  Serial.println("Rotating CCW"); // DEBUGGING
+    set_motor_speed(LEFT_MOT, speed); 
+    set_motor_speed(RIGHT_MOT, speed); 
 
     set_motor_direction(LEFT_MOT, -1);
     set_motor_direction(RIGHT_MOT, 1);
 }
 
 // NEEDS TEST
-void rotate_cw(){
-  Serial.println("Rotating CW") // DEBUGGING
-    set_motor_speed(LEFT_MOT, 250); 
-    set_motor_speed(RIGHT_MOT, 250); 
+void rotate_cw(int speed){
+  Serial.println("Rotating CW"); // DEBUGGING
+    set_motor_speed(LEFT_MOT, speed); 
+    set_motor_speed(RIGHT_MOT, speed); 
 
     set_motor_direction(LEFT_MOT, 1);
     set_motor_direction(RIGHT_MOT, -1);
 }
 
 // DONE? NEEDS A LOT OF TEST!!!
-void follow_line(){
+void follow_line(int forward_speed, int rotation_speed){
     if(ll_value == false && l_value == false && r_value == false && rr_value == false){
-        Serial.println("Moving straight") // DEBUGGING
-        set_motor_speed(LEFT_MOT, 250); 
-        set_motor_speed(RIGHT_MOT, 250); 
+        Serial.println("Moving straight");// DEBUGGING
+        set_motor_speed(LEFT_MOT, forward_speed); 
+        set_motor_speed(RIGHT_MOT, forward_speed); 
         set_motor_direction(LEFT_MOT, 1);
         set_motor_direction(RIGHT_MOT, 1);
     }
 
     else if(ll_value == false && l_value == true && r_value == false && rr_value == false){
-        rotate_ccw();
+        rotate_ccw(rotation_speed);
     }
 
     else if(ll_value == false && l_value == false && r_value == true && rr_value == false){
-        rotate_cw();
+        rotate_cw(rotation_speed);
     }
 
     else if(ll_value == true && l_value == false && r_value == false && rr_value == false){
-        rotate_ccw();
+        rotate_ccw(rotation_speed);
     }
 
     else if(ll_value == false && l_value == false && r_value == false && rr_value == true){
-        rotate_cw();
+        rotate_cw(rotation_speed);
     }
 
     else if(ll_value == true && l_value == true && r_value == false && rr_value == false){
         // Left T-junction
-        Serial.println("LEFT T-Junction DETECTED") // DEBUGGING
+        Serial.println("LEFT T-Junction DETECTED"); // DEBUGGING
         tjc++;
-        rotate_ccw();
+        rotate_ccw(rotation_speed);
     }
 
     else if(ll_value == false && l_value == false && r_value == true && rr_value == true){
         // Right T-junction
-        Serial.println("RIGHT T-Junction DETECTED") // DEBUGGING
+        Serial.println("RIGHT T-Junction DETECTED"); // DEBUGGING
         tjc++;
-        rotate_cw();
+        rotate_cw(rotation_speed);
     }
 
     else if(ll_value == true && l_value == true && r_value == true && rr_value == true){
@@ -254,13 +250,12 @@ int stage_action(int stage){
                 stage_start = false;
                 }
             // ==========================================================
-            // ask Tim Love if it is better to call a function each time or to write a separate code
 
             if (ll_value && l_value && r_value && rr_value){tjc++;} // Record the T joint
             if (tjc == 2) {
                 set_motor_direction(LEFT_MOT, 0);
                 set_motor_direction(RIGHT_MOT, 0);
-                rotate_angle(90);
+                rotate_ccw();
                 stage++;
                 stage_start = true;
             }
@@ -318,15 +313,6 @@ void loop() {
     // r_value = digitalRead(r_pin);
     // rr_value = digitalRead(rr_pin);
 
-    rotate_angle(90);
-    delay(500);
-    
-    rotate_angle(90);
-    delay(500);
-    rotate_angle(90);
-    delay(500);
-    rotate_angle(90);
-    delay(500);
     // follow_line();
     // stage = stage_action(stage);
 } 
