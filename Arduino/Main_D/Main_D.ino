@@ -19,12 +19,13 @@
 // GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
 #define delay_per_degree 12.9 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
 #define stagnation_time 500 // Time allowed for a line sensor to be continuously active || TEST
-#define tj_detection_interval 100 // Minimum time difference between consecutive detection of t-jucntions || TEST
-#define line_crossing_delay 60 // Minimum time delay that ensures that the line sensor goes through the line without getting activated || TEST
+#define tj_detection_interval 200 // Minimum time difference between consecutive detection of t-jucntions || TEST
+#define line_crossing_delay 100 // Minimum time delay that ensures that the line sensor goes through the line without getting activated || TEST
 #define wheel_dist 220 // Distance between the centers of the wheels, NEED TO MEASURE
 #define llrr 75 // Distance between left-most and right-most sensors, NEED TO VERIFY
 #define lr 25 // Distance between left and right sensors, NEED TO VERIFY
 #define line_width 19 // Width of the white line, NEED TO VERIFY
+#define pick_up_distance 60
 #define pi 3.141593
 
 // Create motor objects
@@ -34,9 +35,15 @@ Adafruit_DCMotor* left_motor = AFMS.getMotor(2);
 Adafruit_DCMotor* motors[] = {left_motor, right_motor}; // Make an array with the mototrs for convenient handling
 
 // Useful flags
-int stage = 0; // Counter that determines the stage of the delivery process, robot's actions are determined by the stage number
+int delivery_stage = 1; // Counter that determines the stage of the delivery process, robot's actions are determined by the stage number
 int tjc = 0; // T joint count (as seen from robot's perspective)
+int temp_counter = 0;
 bool stage_start = true; // Indicator for the start of a new stage
+bool rotating = false;
+bool reached_main_loop = false;
+bool on_main_loop = false;
+bool block_picked_up = false;
+bool block_detected = false;
 
 // Variable init
 int motor_speeds[] = {0, 0};
@@ -47,10 +54,9 @@ bool ll_value;
 bool l_value;
 bool r_value;
 bool rr_value;
+int ll_rr_up_flag = 0;
 bool l_up = false; // flag to check if left sensor is on 
 bool r_up = false; // flag to check if right sensor is on 
-bool block_picked_up = false;
-bool block_detected = false;
 unsigned long t_l = 0; // to measure the up-time of the left sensor
 unsigned long t_r = 0; // to measure the up-time of the right sensor
 unsigned long t_tjc = 0;
@@ -60,6 +66,7 @@ void tjCounter(){
     // Counter of T-junctions, with protection against excessive counting
     if (millis() - t_tjc > tj_detection_interval){tjc++; t_tjc = millis();}
     Serial.println("T junction encountered!"); // DEBUGGING
+    Serial.println(tjc); // DEBUGGING
 }
 
 // TEST THIS!!!! (TRY NOT TO USE!!!)
@@ -116,13 +123,11 @@ void set_motor_speed(int motor, int speed){
         // Don't change the speed if it is the same 
         if (motor_speeds[motor] != speed){
             motors[motor]->setSpeed(speed); motor_speeds[motor] = speed; motor_velocities[motor] = velocity(motor);
-            Serial.println("Speed set!"); // For debugging
         }
-        else{Serial.println("Speed is already set!");}; // For debugging}
     }
-
     else{
-        Serial.println("motor should be either 0 or 1"); // For debugging
+        Serial.println(motor); // For debugging
+        Serial.println("motor should be either 0 or 1");
     }
 }
 
@@ -134,24 +139,18 @@ void set_motor_direction(int motor, int direction){
             // Assign the correct direction for the motors
             if (direction == 1){
                 motors[motor]->run(FORWARD);
-                Serial.println("Direction Set!"); // For debugging
             }
             else if (direction == 0){
                 motors[motor]->run(RELEASE);
-                Serial.println("Direction Set!"); // For debugging
             }
             else if (direction == -1){
                 motors[motor]->run(BACKWARD);
-                Serial.println("Direction Set!"); // For debugging
             }
             else { 
                 // Check for correct direction assignment
                 Serial.println("Direction not defined"); // For debugging
                 return;
             }
-        }
-        else{
-          Serial.println("Direction is already set"); // For debugging
         }
 
         motor_directions[motor] = direction; motor_velocities[motor] = velocity(motor);
@@ -188,7 +187,6 @@ void rotate_angle(float angle){
 
 // NEEDS TEST
 void rotate_ccw(int speed){
-  Serial.println("Rotating CCW"); // DEBUGGING
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
 
@@ -198,7 +196,6 @@ void rotate_ccw(int speed){
 
 // NEEDS TEST
 void rotate_cw(int speed){
-  Serial.println("Rotating CW"); // DEBUGGING
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
 
@@ -221,7 +218,6 @@ void follow_line(int forward_speed, int rotation_speed){
     }
 
     if(ll_value == false && l_value == false && r_value == false && rr_value == false){ // 0000
-        Serial.println("Moving straight");// DEBUGGING
         set_motor_speed(LEFT_MOT, forward_speed); 
         set_motor_speed(RIGHT_MOT, forward_speed); 
         set_motor_direction(LEFT_MOT, 1);
@@ -266,56 +262,97 @@ void follow_line(int forward_speed, int rotation_speed){
     }
 }
 
-int stage_action(int stage){
-  Serial.print("Current Stage: "); // DEBUGGING
-  Serial.println(stage); // DEBUGGING
+int stage_action(int delivery_stage){
     // ADD for stage shifts, e.g. time based, encoder value based, ultrasonic sensor value based
-    switch (stage) {
-        case 0: // Getting out of the drop-off/start box || TEST
+    switch (delivery_stage) {
+        case 1: // Getting out of the drop-off/start box || TEST
             if (stage_start){
                 // Start going forward
+                Serial.print("Current Stage: "); // DEBUGGING
+                Serial.println(delivery_stage); // DEBUGGING
+                set_motor_speed(LEFT_MOT, 140); 
+                set_motor_speed(RIGHT_MOT, 140); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 stage_start = false;
                 Serial.println("Start"); // DEBUGGING
                 }
-            // ==========================================================
 
-            if (ll_value && l_value && r_value && rr_value){tjCounter();} // Record the T-junction
-            if (tjc == 2) {
-                Serial.println("Reached the main loop"); // DEBUGGING
-                // Stop
-                set_motor_direction(LEFT_MOT, 0);
-                set_motor_direction(RIGHT_MOT, 0);
-                // Start rotating
-                rotate_ccw(150);
-                // wait untill the ll sensor sees the starting box line
-                while (!ll_value){
-                    // Do nothing
+            if (!reached_main_loop){
+                if (ll_value || rr_value){tjCounter();} // Record the T-junction
+                if (tjc == 2) {
+                    reached_main_loop = true;
+                    Serial.println("reached main loop");
                 }
-                // Stop and go to the next stage
-                set_motor_direction(LEFT_MOT, 0);
-                set_motor_direction(RIGHT_MOT, 0);
-                stage = 1;
-                stage_start = true;
+                break;
+            }
+
+            else if (!on_main_loop){
+                if (ll_value && rr_value){
+                    delay((int) line_crossing_delay / 3);
+                    on_main_loop = true;
+                    Serial.println("both on");
+                    break;
+                }
+                else if (ll_value){
+                    if (ll_rr_up_flag == 1){
+                        on_main_loop = true;
+                        Serial.println("right first");
+                    }
+                    ll_rr_up_flag = -1;
+                    break;
+                }
+                else if (rr_value){
+                    if (ll_rr_up_flag == -1){
+                        on_main_loop = true;
+                        Serial.println("left first");
+                    }
+                    ll_rr_up_flag = 1;
+                    break;
+                }
+            }
+                
+            if (on_main_loop){
+                Serial.println("on main loop");
+                if (!rotating){
+                    // Stop
+                    set_motor_direction(LEFT_MOT, 0);
+                    set_motor_direction(RIGHT_MOT, 0);
+                    // Start rotating
+                    Serial.println("started rotating"); // DEBUGGING
+                    rotate_ccw(145);
+                    delay(line_crossing_delay * 2);
+                    rotating = true;
+                    break;
+                }
+                else if((!ll_value && !l_value && !r_value && !rr_value) || ll_value){
+                    // Stop and go to the next stage
+                    set_motor_direction(LEFT_MOT, 0);
+                    set_motor_direction(RIGHT_MOT, 0);
+                    delivery_stage++;
+                    stage_start = true;
+                    break;
+                }
             }
             break;
-        case 1: // Getting to the tunnel || TEST
+        case 2: // Getting to the tunnel || TEST
             if (stage_start){
                 // Start moving forward
+                Serial.print("Current Stage: "); // DEBUGGING
+                Serial.println(delivery_stage); // DEBUGGING
+                Serial.println("Start"); // DEBUGGING
                 set_motor_speed(LEFT_MOT, 170); 
                 set_motor_speed(RIGHT_MOT, 170); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 delay(line_crossing_delay); // to get off the initial line that connects start box to the main loop || TEST THE DELAY
                 stage_start = false;
-                Serial.println("Start"); // DEBUGGING
             }
 
             if (distance_ultrasonic(echoPinSide) <= 60){ // TEST THE DISTANCE
                 // Ultrasonic sensor sees the wall of the tunnel, change the stage
                 Serial.println("Reached the tunnel"); // DEBUGGING
-                stage = 2;
+                delivery_stage = 3;
                 stage_start=true;
                 break;
             }
@@ -325,9 +362,11 @@ int stage_action(int stage){
             
             follow_line(170, 150); // TEST THE SPEED
             break;
-        case 2: // Going through the tunnel
+        case 3: // Going through the tunnel
             if (stage_start){
                 // Start moving forward
+                Serial.print("Current Stage: "); // DEBUGGING
+                Serial.println(delivery_stage); // DEBUGGING
                 set_motor_speed(LEFT_MOT, 170); 
                 set_motor_speed(RIGHT_MOT, 170); 
                 set_motor_direction(LEFT_MOT, 1);
@@ -339,13 +378,13 @@ int stage_action(int stage){
             if (distance_ultrasonic(echoPinSide) > 60){ // TEST THE DISTANCE
                 // Ultrasonic sensor does not see the wall of the tunnel anymore, change the stage
                 Serial.println("Out of the tunnel"); // DEBUGGING
-                stage = 3;
+                delivery_stage = 4;
                 stage_start=true;
                 break;
             }
             // Maybe add an additional check for the distance from the front wall
             break;
-        case 3: // Locating the block and getting close to it
+        case 4: // Locating the block and getting close to it
             if (stage_start){
                 // Some kind of wiggly motion to find the line?
                 stage_start = false;
@@ -359,7 +398,7 @@ int stage_action(int stage){
                     // Stop
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
-                    stage = 42; // block located at the second pick-up location
+                    delivery_stage = 52; // block located at the second pick-up location
                     stage_start=true;
                     break;
                 }
@@ -372,8 +411,8 @@ int stage_action(int stage){
                     // Stop
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
-                    if (tjc == 4){stage = 41; Serial.println("Block located at the first location");} // DEBUGGING // block located at the first pick-up location
-                    else if (tjc == 6){stage = 43; Serial.println("Block located at the first location");} // DEBUGGING // block located at the third pick-up location
+                    if (tjc == 4){delivery_stage = 51; Serial.println("Block located at the first location");} // DEBUGGING // block located at the first pick-up location
+                    else if (tjc == 6){delivery_stage = 53; Serial.println("Block located at the first location");} // DEBUGGING // block located at the third pick-up location
                     stage_start=true;
                     break;
                 }
@@ -388,25 +427,29 @@ int stage_action(int stage){
             follow_line(170, 150);
 
             break;
-        case 41: // First pick-up location. Picking up the block and getting outside the pick-up zone
+        case 51: // First pick-up location. Picking up the block and getting outside the pick-up zone
             if (stage_start){
                 // Some kind of wiggly motion to find the line?
                 stage_start = false;
                 Serial.println("Start"); // DEBUGGING
                 rotate_cw(100);
             }
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
            
             if (distance_ultrasonic(echoPinFront) < 150){
-
+                set_motor_direction(LEFT_MOT, 0);
+                set_motor_direction(RIGHT_MOT, 0);
             }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////            
+            if (distance_ultrasonic(echoPinFront) > pick_up_distance){
+                set_motor_direction(LEFT_MOT, 0);
+                set_motor_direction(RIGHT_MOT, 0);
+            }
+
             break;
-        case 42: // Second pick-up location. Picking up the block and getting outside the pick-up zone
+        case 52: // Second pick-up location. Picking up the block and getting outside the pick-up zone
         
             break;
-        case 43: // Third pick-up location. Picking up the block and getting outside the pick-up zone
+        case 53: // Third pick-up location. Picking up the block and getting outside the pick-up zone
         
             break;
 
@@ -426,11 +469,14 @@ void setup() {
     pinMode(echoPinSide, INPUT);
     pinMode(trigPin, OUTPUT);
 
-    set_motor_speed(LEFT_MOT, 240); 
-    set_motor_speed(RIGHT_MOT, 240); 
+    delay(15000);
+    //set_motor_speed(LEFT_MOT, 170); 
+    //set_motor_speed(RIGHT_MOT, 170); 
+    //set_motor_direction(LEFT_MOT, -1);
+    //set_motor_direction(RIGHT_MOT, -1);
+    //delay(3000);
     set_motor_direction(LEFT_MOT, 0);
     set_motor_direction(RIGHT_MOT, 0);
-    delay(3000);
 }
 
 void loop() {
@@ -444,7 +490,7 @@ void loop() {
     if (!l_value){l_up = false;}
     if (!r_value){r_up = false;} 
     
-
-    // follow_line();
-    // stage_action(stage);
+    //follow_line(170, 145);
+    stage_action(delivery_stage);
+    Serial.println(delivery_stage);
 } 
