@@ -1,6 +1,7 @@
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
 #include "utility/Adafruit_MS_PWMServoDriver.h"
+#include <servo.h>
 
 // ALL LENGTHS ARE IN MM!!
 
@@ -15,6 +16,7 @@
 // MOTOR INDICIES
 #define LEFT_MOT 0 // Index of the left motor
 #define RIGHT_MOT 1 // Index of the right motor
+#define CLAW_MOT 2 // Index for claw motor
 
 // GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
 #define delay_per_degree 12.9 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
@@ -34,7 +36,11 @@
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor* right_motor = AFMS.getMotor(1);
 Adafruit_DCMotor* left_motor = AFMS.getMotor(2);
-Adafruit_DCMotor* motors[] = {left_motor, right_motor}; // Make an array with the mototrs for convenient handling
+Adafruit_DCMotor* motors[] = {left_motor, right_motor, claw_motor}; // Make an array with the mototrs for convenient handling
+
+Adafruit_DCMotor* claw_motor = AFMS.getMotor(3); // motor for claw
+
+Servo lift_servo;  // attach servo to pin 2 in setup havent done yet not sure if thats how it works
 
 // Useful flags
 int delivery_stage = 1; // Counter that determines the stage of the delivery process, robot's actions are determined by the stage number
@@ -46,6 +52,9 @@ bool reached_main_loop = false;
 bool on_main_loop = false;
 bool block_picked_up = false;
 bool block_detected = false;
+bool red_block = false;
+bool green_block = false;
+bool drop = false;
 
 // Variable init
 int motor_speeds[] = {0, 0};
@@ -264,6 +273,18 @@ void follow_line(int forward_speed, int rotation_speed){
     }
 }
 
+void grab_block(void) {
+  set_motor_speed(CLAW_MOT, 100);
+  set_motor_direction(CLAW_MOT, 1);
+}
+
+void drop_block(void) {
+  if(drop == true) {
+    
+  }
+}
+
+
 int stage_action(int delivery_stage){
     // ADD for stage shifts, e.g. time based, encoder value based, ultrasonic sensor value based
     switch (delivery_stage) {
@@ -464,16 +485,40 @@ int stage_action(int delivery_stage){
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
               //initiate droppin sequence turn left soon when ll_value = 1  !
+              stage_start = true;
             }
             if (green_block && distance_ultrasonic(echoPinFront) < 190) {
               Serial.println("in range for green stop");
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
               //initiate droppin sequence turn left soon when ll_value = 1  !
+              stage_start = true;
             }
             break
         
-        case 70: //
+        case 70: // get to the right place drop the box drop the box
+            if (stage_start){
+                // Start turning left
+                set_motor_speed(LEFT_MOT, 100); 
+                set_motor_speed(RIGHT_MOT, 100); 
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1);
+                
+                stage_start = false;
+            }        
+            if(distance_ultrasonic(echoPinFront) < drop_distance) {
+              set_motor_direction(LEFT_MOT, 0);
+              set_motor_direction(RIGHT_MOT, 0);
+              stage_start = true; // final stage drop it
+
+            
+
+            }
+        case 80:
+          if (stage_start){
+            drop = true: // added this bool but probably a better way to do it check!! also adding a function for drop
+          }
+
 
         */
       
