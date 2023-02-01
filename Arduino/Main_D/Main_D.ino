@@ -27,6 +27,8 @@
 #define line_width 19 // Width of the white line, NEED TO VERIFY
 #define pick_up_distance 60
 #define pi 3.141593
+#define red_area_d 745
+#define greed_area_d 190
 
 // Create motor objects
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -452,6 +454,25 @@ int stage_action(int delivery_stage){
         case 53: // Third pick-up location. Picking up the block and getting outside the pick-up zone
         
             break;
+        /* 
+        case 60:: locating the right drop off location
+            //red area distance from wall = 745
+            //green area distance from wall = 190  make variables for these!
+
+            if (red_block && distance_ultrasonic(echoPinFront) < 760) {
+              Serial.println("in range for red stop");
+              set_motor_direction(LEFT_MOT, 0);
+              set_motor_direction(RIGHT_MOT, 0);
+              //initiate droppin sequence turn left!
+            }
+            if (green_block && distance_ultrasonic(echoPinFront) < 180) {
+              Serial.println("in range for green stop");
+              set_motor_direction(LEFT_MOT, 0);
+              set_motor_direction(RIGHT_MOT, 0);
+              //initiate droppin sequence turn left!
+            }
+            break
+        */
 
     }
 }
