@@ -463,16 +463,20 @@ int stage_action(int delivery_stage){
               Serial.println("in range for red stop");
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
-              //initiate droppin sequence turn left!
+              //initiate droppin sequence turn left soon when ll_value = 1  !
             }
-            if (green_block && distance_ultrasonic(echoPinFront) < 180) {
+            if (green_block && distance_ultrasonic(echoPinFront) < 190) {
               Serial.println("in range for green stop");
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
-              //initiate droppin sequence turn left!
+              //initiate droppin sequence turn left soon when ll_value = 1  !
             }
             break
+        
+        case 70: //
+
         */
+      
 
     }
 }
