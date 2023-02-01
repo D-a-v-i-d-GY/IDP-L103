@@ -489,7 +489,7 @@ void loop() {
     if (r_value && !r_up){t_r = millis(); r_up = true;} 
     if (!l_value){l_up = false;}
     if (!r_value){r_up = false;} 
-    
+    // test
     //follow_line(170, 145);
     stage_action(delivery_stage);
     Serial.println(delivery_stage);
