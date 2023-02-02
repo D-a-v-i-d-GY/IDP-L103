@@ -31,6 +31,9 @@
 #define pi 3.141593
 #define red_area_d 745
 #define greed_area_d 190
+#define lift_angle 60
+#define drop_distance 60 // random guess gotta check tghis the distance we initiate drop sequence
+#define release_distance 30 // again gotta check when we drop it
 
 // Create motor objects
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -40,7 +43,7 @@ Adafruit_DCMotor* motors[] = {left_motor, right_motor, claw_motor}; // Make an a
 
 Adafruit_DCMotor* claw_motor = AFMS.getMotor(3); // motor for claw
 
-Servo lift_servo;  // attach servo to pin 2 in setup havent done yet not sure if thats how it works
+Servo lift_servo;  // attach servo to pin 9 in setup havent done yet not sure if thats how it works
 
 // Useful flags
 int delivery_stage = 1; // Counter that determines the stage of the delivery process, robot's actions are determined by the stage number
@@ -55,6 +58,7 @@ bool block_detected = false;
 bool red_block = false;
 bool green_block = false;
 bool drop = false;
+bool grab_block = false;
 
 // Variable init
 int motor_speeds[] = {0, 0};
@@ -273,14 +277,31 @@ void follow_line(int forward_speed, int rotation_speed){
     }
 }
 
-void grab_block(void) {
-  set_motor_speed(CLAW_MOT, 100);
-  set_motor_direction(CLAW_MOT, 1);
+void grab_block() {
+  if(grab_block == true) {
+    set_motor_speed(CLAW_MOT, 100);
+    set_motor_direction(CLAW_MOT, 1);
+    grab_block == false;
+    Serial.println("block grabbed");
+  }
 }
 
-void drop_block(void) {
+void drop_block() {
   if(drop == true) {
-    
+    lift_servo.write (lift_angle);
+    delay(1000);
+    if(distance_ultrasonic(echoPinFront) > release_distance) {
+      set_motor_direction(LEFT_MOT, 1);
+      set_motor_direction(RIGHT_MOT, 1);
+    }
+    else() {
+      set_motor_direction(LEFT_MOT, 1);
+      set_motor_direction(RIGHT_MOT, 1);
+      delay(500);
+      set_motor_direction(CLAW_MOT, 0);
+      Serial.println("block released")
+    }
+    drop = false;
   }
 }
 
@@ -467,6 +488,8 @@ int stage_action(int delivery_stage){
                 set_motor_direction(LEFT_MOT, 0);
                 set_motor_direction(RIGHT_MOT, 0);
             }
+            grab_block = true;
+            
 
             break;
         case 52: // Second pick-up location. Picking up the block and getting outside the pick-up zone
@@ -547,6 +570,8 @@ void setup() {
     //delay(3000);
     set_motor_direction(LEFT_MOT, 0);
     set_motor_direction(RIGHT_MOT, 0);
+
+    lift_servo.attach (9);
 }
 
 void loop() {
@@ -561,6 +586,7 @@ void loop() {
     if (!r_value){r_up = false;} 
     // test
     //follow_line(170, 145);
+    // drop_block;
     stage_action(delivery_stage);
     Serial.println(delivery_stage);
 } 
