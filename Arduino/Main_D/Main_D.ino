@@ -1,7 +1,7 @@
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
 #include "utility/Adafruit_MS_PWMServoDriver.h"
-#include <servo.h>
+#include <Servo.h>
 
 // ALL LENGTHS ARE IN MM!!
 
@@ -39,9 +39,10 @@
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor* right_motor = AFMS.getMotor(1);
 Adafruit_DCMotor* left_motor = AFMS.getMotor(2);
+Adafruit_DCMotor* claw_motor = AFMS.getMotor(3);
 Adafruit_DCMotor* motors[] = {left_motor, right_motor, claw_motor}; // Make an array with the mototrs for convenient handling
 
-Adafruit_DCMotor* claw_motor = AFMS.getMotor(3); // motor for claw
+
 
 Servo lift_servo;  // attach servo to pin 9 in setup havent done yet not sure if thats how it works
 
@@ -58,7 +59,7 @@ bool block_detected = false;
 bool red_block = false;
 bool green_block = false;
 bool drop = false;
-bool grab_block = false;
+bool grab = false;
 
 // Variable init
 int motor_speeds[] = {0, 0};
@@ -278,10 +279,10 @@ void follow_line(int forward_speed, int rotation_speed){
 }
 
 void grab_block() {
-  if(grab_block == true) {
+  if(grab == true) {
     set_motor_speed(CLAW_MOT, 100);
     set_motor_direction(CLAW_MOT, 1);
-    grab_block == false;
+    grab == false;
     Serial.println("block grabbed");
   }
 }
@@ -294,12 +295,12 @@ void drop_block() {
       set_motor_direction(LEFT_MOT, 1);
       set_motor_direction(RIGHT_MOT, 1);
     }
-    else() {
+    else {
       set_motor_direction(LEFT_MOT, 1);
       set_motor_direction(RIGHT_MOT, 1);
       delay(500);
       set_motor_direction(CLAW_MOT, 0);
-      Serial.println("block released")
+      Serial.println("block released");
     }
     drop = false;
   }
@@ -488,7 +489,7 @@ int stage_action(int delivery_stage){
                 set_motor_direction(LEFT_MOT, 0);
                 set_motor_direction(RIGHT_MOT, 0);
             }
-            grab_block = true;
+            grab = true;
             
 
             break;
