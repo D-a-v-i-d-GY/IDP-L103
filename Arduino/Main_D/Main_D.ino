@@ -180,7 +180,7 @@ void set_motor_direction(int motor, int direction){
 // NEEDS TEST (TRY NOT TO USE!!!)
 void rotate_angle(float angle){
     // This function makes the robot rotate around the center of the wheel axis by the given angle, CCW is assumed positive
-
+  
     set_motor_speed(LEFT_MOT, 240); 
     set_motor_speed(RIGHT_MOT, 240);
     // 4 seconds for full rotation at 240
@@ -545,9 +545,74 @@ int stage_action(){
         case 80:
           if (stage_start){
             drop = true: // added this bool but probably a better way to do it check!! also adding a function for drop
+            stage_start = true;
           }
+        case 90: // getting back on the line
+          if (stage_start) {
+            rotate_angle(180);
+            stage_start = false;
+          }
+          if(l_value == false && r_value == false) {
+            set_motor_direction(LEFT_MOT, 1);
+            set_motor_direction(RIGHT_MOT, 1);
+            // go straiht until some line detected
+          }
+          else{
+            stage_start = true;
+          }
+        case 100: // on the line turnn the right way
+          if(stage_start){
+            stage_start = false;
+          }
+          follow_line(170,145);
+          if(ll_value == true || rr_value == true){
+            if(red_block == true) {
+              rotate_ccw(145);
+            }
+            if(blue_block == true) {
+              rotate_cw(145);
+            }
+            delay(500);
+            stage_start = true; //hopefully facing the right way    
+          }
+        case 110: // find the starting point   testtttt
+          if(stage_start) {
+            stage_start = false;             
+          }
+          if(red_block){
+            if(ll_sensor == false) {
+              follow_line(170,145);
+            }
+            else {
+              rotate_ccw(100);
+              delay(500);
+              stage_start = true;
+            }
+          }
+          if(blue_block) {
+            if(ll_sensor == false) {
+              follow_line(170,145);
+            }
+            else {
+              rotate_cw(100);
+              delay(500);
+              stage_start = true;
+            }
+          }
+          case 120: //final case we stop
+            if(stage_start){
+              stage_start = false;
+            }
+            
+            if (distance_ultrasonic(echoPinFront) > 100){
+              follow_line(170,145); // hopefully its straight by now
+            }
+            else{
+              set_motor_direction(LEFT_MOT, 0);
+              set_motor_direction(RIGHT_MOT, 0);
+            }  // we have stopped
 
-
+  
         */
       
 
