@@ -516,7 +516,8 @@ int stage_action(){
         case 70: // get to the right place drop the box drop the box
             if (stage_start){
                 // Start turning right
-                rotate_angle(90);
+                rotate_cw(145);
+                delay(line_crossing_delay * 2);
                 
                 stage_start = false;
             }
@@ -539,7 +540,7 @@ int stage_action(){
           break;
         case 90: // getting back on the line
           if (stage_start) {
-            rotate_angle(180);
+            rotate_angle(180); // testtt might not work
             stage_start = false;
           }
           if(l_value == false && r_value == false) {
