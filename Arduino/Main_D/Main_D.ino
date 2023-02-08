@@ -88,6 +88,15 @@ void tjCounter(){
     Serial.println(tjc); // DEBUGGING
 }
 
+bool sensorRead(int pin){
+    bool reading;
+    int out = digitalRead(pin);
+    if (out == 0){reading = false;}
+    else{reading = true;}
+
+    return reading;
+}
+
 // TEST THIS!!!! (TRY NOT TO USE!!!)
 float velocity(int motor){
     // Return velocity based on the speed of the motor
@@ -285,7 +294,7 @@ void follow_line(int forward_speed, int rotation_speed){
 void grab_block() {
   if(grab == true) {
     grab == false;
-    grab_servo.write (grab_angle);
+    grab_servo.write(grab_angle);
     delay(1000);
     Serial.println("block grabbed");
   }
@@ -293,8 +302,10 @@ void grab_block() {
 
 void drop_block() {
   if(drop == true) {
-    grab_servo.write (0);
+    drop == false;
+    grab_servo.write(0);
     delay(1000);
+    Serial.println("block dropped");
   }
 
 }
@@ -363,12 +374,12 @@ int stage_action(){
                     set_motor_direction(RIGHT_MOT, 0);
                     // Start rotating
                     Serial.println("started rotating"); // DEBUGGING
-                    rotate_ccw(145);
+                    rotate_cw(145);
                     delay(line_crossing_delay * 2); // THIS DELAY IS VERY IMPORTANT, IT HAS TO BE LONG ENOUGH TO MAKE SURE THE LEFT SENSOR IS ON THE LINE
                     rotating = true;
                     break;
                 }
-                else if((!ll_value && !l_value && !r_value && !rr_value) || ll_value){
+                else if((!ll_value && !l_value && !r_value && !rr_value) || (rr_value && ll_rr_up_flag == -1)){ // <- IMPROVE THIS
                     // Stop and go to the next stage
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
@@ -378,7 +389,7 @@ int stage_action(){
                 }
             }
             break;
-        case 2: // Getting to the tunnel || TEST
+        case 2: // Getting close to the ramp || TEST
             if (stage_start){
                 // Start moving forward
                 Serial.print("Current Stage: "); // DEBUGGING
@@ -407,6 +418,16 @@ int stage_action(){
 
             follow_line(170, 145); // TEST THE SPEED
             break;
+        case 3: // Going over the ramp
+            if (stage_start){
+                // Start moving forward
+                Serial.print("Current Stage: "); // DEBUGGING
+                Serial.println(delivery_stage); // DEBUGGING
+                stage_start = false;
+                Serial.println("Start"); // DEBUGGING
+            }
+
+            follow_line(200, 155);
         case 3: // Going through the tunnel
             if (stage_start){
                 // Start moving forward
@@ -476,7 +497,7 @@ int stage_action(){
                 }
             }
 
-            follow_line(170, 150);
+            follow_line(170, 145);
 
             break;
         case 51: // First pick-up location. Picking up the block and getting outside the pick-up zone
@@ -653,15 +674,15 @@ void setup() {
 
 void loop() {
   // MODIFY THIS CODE AFTER TESTS
-    ll_value = digitalRead(ll_pin);
-    l_value = digitalRead(l_pin);
-    r_value = digitalRead(r_pin);
-    rr_value = digitalRead(rr_pin);
+    ll_value = sensorRead(ll_pin);
+    l_value = sensorRead(l_pin);
+    r_value = sensorRead(r_pin);
+    rr_value = sensorRead(rr_pin);
     if (l_value && !l_up){t_l = millis(); l_up = true;} 
     if (r_value && !r_up){t_r = millis(); r_up = true;} 
     if (!l_value){l_up = false;}
     if (!r_value){r_up = false;}
-    follow_line(170, 145);
+    //follow_line(170, 145);
     //stage_action();
     //Serial.println(delivery_stage);
 } 
