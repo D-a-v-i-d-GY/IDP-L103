@@ -483,7 +483,7 @@ int stage_action(){
                 set_motor_direction(RIGHT_MOT, 0);
             }
             grab = true;
-            
+            grab_block();
 
             break;
         case 52: // Second pick-up location. Picking up the block and getting outside the pick-up zone
@@ -494,35 +494,33 @@ int stage_action(){
             break;
         /* 
         case 60:: locating the right drop off location
-            //red area distance from wall = 745
-            //green area distance from wall = 190  make variables for these!  // these need to change!!
+            //green area distance from wall = 500
+            //red area distance from wall = 1900  make variables for these!  // these need to change!!
 
-            if (red_block && distance_ultrasonic(echoPinFront) < 760) {
+            if (red_block && distance_ultrasonic(echoPinFront) < 1900) {
               Serial.println("in range for red stop");
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
               //initiate droppin sequence turn left soon when ll_value = 1  !
               stage_start = true;
             }
-            if (green_block && distance_ultrasonic(echoPinFront) < 190) {
+            if (green_block && distance_ultrasonic(echoPinFront) < 500) {
               Serial.println("in range for green stop");
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
-              //initiate droppin sequence turn left soon when ll_value = 1  !
+              //initiate droppin sequence turn right soon when rr_value = 1  !
               stage_start = true;
             }
-            break
+            break;
         
         case 70: // get to the right place drop the box drop the box
             if (stage_start){
-                // Start turning left
-                set_motor_speed(LEFT_MOT, 100); 
-                set_motor_speed(RIGHT_MOT, 100); 
-                set_motor_direction(LEFT_MOT, 1);
-                set_motor_direction(RIGHT_MOT, 1);
+                // Start turning right
+                rotate_angle(90);
                 
                 stage_start = false;
-            }        
+            }
+            follow_line(120,120);        
             if(distance_ultrasonic(echoPinFront) < drop_distance) {
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
@@ -531,12 +529,14 @@ int stage_action(){
             
 
             }
+            break;
         case 80:
           if (stage_start){
             drop = true; // added this bool but probably a better way to do it check!! also adding a function for drop
             drop_block();
             stage_start = true;
           }
+          break;
         case 90: // getting back on the line
           if (stage_start) {
             rotate_angle(180);
@@ -550,6 +550,7 @@ int stage_action(){
           else{
             stage_start = true;
           }
+          break;
         case 100: // on the line turnn the right way
           if(stage_start){
             stage_start = false;
@@ -564,7 +565,7 @@ int stage_action(){
             }
             delay(500);
             stage_start = true; //hopefully facing the right way    
-          }
+          break;
         case 110: // find the starting point   testtttt
           if(stage_start) {
             stage_start = false;             
@@ -589,6 +590,7 @@ int stage_action(){
               stage_start = true;
             }
           }
+          break;
         case 120: //final case we stop
           if(stage_start){
             stage_start = false;
