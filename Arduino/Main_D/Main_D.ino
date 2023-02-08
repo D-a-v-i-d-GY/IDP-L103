@@ -39,11 +39,11 @@
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor* right_motor = AFMS.getMotor(1);
 Adafruit_DCMotor* left_motor = AFMS.getMotor(2);
-Adafruit_DCMotor* claw_motor = AFMS.getMotor(3);
-Adafruit_DCMotor* motors[] = {left_motor, right_motor, claw_motor}; // Make an array with the mototrs for convenient handling
+
+Adafruit_DCMotor* motors[] = {left_motor, right_motor}; // Make an array with the mototrs for convenient handling
 
 
-Servo lift_servo;  // attach servo to pin 9 in setup havent done yet not sure if thats how it works
+Servo grab_servo;  // attach servo to pin 9 in setup havent done yet not sure if thats how it works
 
 // Useful flags
 int delivery_stage = 1; // Counter that determines the stage of the delivery process, robot's actions are determined by the stage number
@@ -280,14 +280,14 @@ void follow_line(int forward_speed, int rotation_speed){
 
 void grab_block() {
   if(grab == true) {
-    lift_servo.write (grab_angle);
+    grab_servo.write (grab_angle);
     delay(1000);
   }
 }
 
 void drop_block() {
   if(drop == true) {
-    lift_servo.write (0);
+    grab_servo.write (0);
     delay(1000);
   }
 
@@ -631,7 +631,7 @@ void setup() {
     set_motor_direction(LEFT_MOT, 0);
     set_motor_direction(RIGHT_MOT, 0);
 
-    lift_servo.attach (9);
+    grab_servo.attach (9);
 }
 
 void loop() {
