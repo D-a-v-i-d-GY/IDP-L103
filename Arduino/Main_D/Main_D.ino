@@ -5,6 +5,7 @@
 
 // ALL LENGTHS ARE IN MM!!
 
+// PINS
 #define ll_pin 13 // Left-most line sensor pin number
 #define l_pin 12 // Left line sensor pin number
 #define r_pin 11 // Right line sensor pin number
@@ -34,6 +35,7 @@
 #define lift_angle 60
 #define drop_distance 60 // random guess gotta check tghis the distance we initiate drop sequence
 #define release_distance 30 // again gotta check when we drop it
+#define tunnel_line_distance 100
 
 // Create motor objects
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -65,6 +67,7 @@ int motor_speeds[] = {0, 0};
 int motor_directions[] = {0, 0};
 float motor_velocities[] = {0.0, 0.0};
 float orientation;
+float tunnel_wall_distance = 0;
 bool ll_value;
 bool l_value;
 bool r_value;
@@ -109,7 +112,7 @@ void orientaion_change(){
     }
 }
 
-// TESTED A LITTLE, MORE TESTS
+// TEST IF IT IS BETTER TO HAVE ONE ECHO PIN OR ONE TRIG PIN
 float distance_ultrasonic (int pinNumber){
     unsigned long duration;
     float distance;
@@ -120,6 +123,7 @@ float distance_ultrasonic (int pinNumber){
     delayMicroseconds(10); // Triggers the sensor
     digitalWrite(trigPin, LOW);
     duration = pulseIn(pinNumber, HIGH); // Measure the duration of the pulse
+    Serial.println(digitalRead(pinNumber));
     distance = (duration / 2) / 2.905;
     if (distance >= 3900){distance=-99;}
     return distance;
@@ -177,7 +181,7 @@ void set_motor_direction(int motor, int direction){
     }
 }
 
-// NEEDS TEST (TRY NOT TO USE!!!)
+// NEEDS PRECISE TESTS
 void rotate_angle(float angle){
     // This function makes the robot rotate around the center of the wheel axis by the given angle, CCW is assumed positive
 
@@ -201,7 +205,7 @@ void rotate_angle(float angle){
     set_motor_direction(RIGHT_MOT, 0);
 }
 
-// NEEDS TEST
+// TESTED
 void rotate_ccw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
@@ -210,7 +214,7 @@ void rotate_ccw(int speed){
     set_motor_direction(RIGHT_MOT, 1);
 }
 
-// NEEDS TEST
+// TESTED
 void rotate_cw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
@@ -219,7 +223,7 @@ void rotate_cw(int speed){
     set_motor_direction(RIGHT_MOT, -1);
 }
 
-// DONE? NEEDS A LOT OF TEST!!!
+// TESTED (EXCEPT STAGNATION!!!), WORKS FINE
 void follow_line(int forward_speed, int rotation_speed){
     // Algorithm for following the line
 
@@ -279,7 +283,7 @@ void follow_line(int forward_speed, int rotation_speed){
 }
 
 void grab_block() {
-  if(grab == true) {
+  if (grab == true) {
     set_motor_speed(CLAW_MOT, 100);
     set_motor_direction(CLAW_MOT, 1);
     grab == false;
@@ -398,7 +402,7 @@ int stage_action(){
                 stage_start = false;
             }
 
-            //if (distance_ultrasonic(echoPinSide) <= 60){ // TEST THE DISTANCE
+            //if (distance_ultrasonic(echoPinSide) <= tunnel_line_distance){ // TEST THE DISTANCE
             //    // Ultrasonic sensor sees the wall of the tunnel, change the stage
             //    Serial.println("Reached the tunnel"); // DEBUGGING
             //    delivery_stage = 3;
@@ -407,8 +411,9 @@ int stage_action(){
             //}
             
             // Give the robot enough time to leave the starting zone, then ignore the drop-off junction 
-            if (millis() - t_stage_st > 3000){if(ll_value == true){tjCounter(); delay(line_crossing_delay); break;}} // Avoid T-junction at the green drop-off || TEST
-            
+            if ((millis() - t_stage_st > 3000) && tjc != 3){if(ll_value == true){tjCounter(); delay(line_crossing_delay); break;}} // Avoid T-junction at the green drop-off || TEST
+            // tjc is equal to 3 after the drop-off junction has been passed
+
             follow_line(170, 145); // TEST THE SPEED
             break;
         case 3: // Going through the tunnel
@@ -422,14 +427,21 @@ int stage_action(){
                 set_motor_direction(RIGHT_MOT, 1);
                 stage_start = false;
                 Serial.println("Start"); // DEBUGGING
+                tunnel_wall_distance = distance_ultrasonic(echoPinSide); // Record the distance from the tunnel at entry
             }
-
-            if (distance_ultrasonic(echoPinSide) > 60){ // TEST THE DISTANCE
+            float side_wall_dist = distance_ultrasonic(echoPinSide);
+            
+            if (side_wall_dist > 150){ // TEST THE DISTANCE
                 // Ultrasonic sensor does not see the wall of the tunnel anymore, change the stage
                 Serial.println("Out of the tunnel"); // DEBUGGING
                 delivery_stage = 4;
                 stage_start=true;
                 break;
+            }
+
+            else{ // TEST THE DISTANCE
+                float x = tunnel_line_distance;
+                rotate_angle(pi/2 - x);
             }
             // Maybe add an additional check for the distance from the front wall
             break;
@@ -522,7 +534,7 @@ int stage_action(){
               //initiate droppin sequence turn left soon when ll_value = 1  !
               stage_start = true;
             }
-            break
+            break;
         
         case 70: // get to the right place drop the box drop the box
             if (stage_start){
@@ -567,7 +579,7 @@ void setup() {
     pinMode(echoPinSide, INPUT);
     pinMode(trigPin, OUTPUT);
 
-    delay(7500);
+    delay(3000);
     //set_motor_speed(LEFT_MOT, 170); 
     //set_motor_speed(RIGHT_MOT, 170); 
     //set_motor_direction(LEFT_MOT, -1);
@@ -588,9 +600,8 @@ void loop() {
     if (l_value && !l_up){t_l = millis(); l_up = true;} 
     if (r_value && !r_up){t_r = millis(); r_up = true;} 
     if (!l_value){l_up = false;}
-    if (!r_value){r_up = false;} 
-    // test
-    //follow_line(170, 145);
-    stage_action();
-    Serial.println(delivery_stage);
+    if (!r_value){r_up = false;}
+    follow_line(170, 145);
+    //stage_action();
+    //Serial.println(delivery_stage);
 } 
