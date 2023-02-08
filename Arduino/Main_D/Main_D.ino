@@ -31,7 +31,7 @@
 #define pi 3.141593
 #define red_area_d 745
 #define greed_area_d 190
-#define lift_angle 60
+#define grab_angle 60
 #define drop_distance 60 // random guess gotta check tghis the distance we initiate drop sequence
 #define release_distance 30 // again gotta check when we drop it
 
@@ -280,31 +280,20 @@ void follow_line(int forward_speed, int rotation_speed){
 
 void grab_block() {
   if(grab == true) {
-    set_motor_speed(CLAW_MOT, 100);
-    set_motor_direction(CLAW_MOT, 1);
-    grab == false;
-    Serial.println("block grabbed");
+    lift_servo.write (grab_angle);
+    delay(1000);
   }
 }
 
 void drop_block() {
   if(drop == true) {
-    lift_servo.write (lift_angle);
+    lift_servo.write (0);
     delay(1000);
-    if(distance_ultrasonic(echoPinFront) > release_distance) {
-      set_motor_direction(LEFT_MOT, 1);
-      set_motor_direction(RIGHT_MOT, 1);
-    }
-    else {
-      set_motor_direction(LEFT_MOT, 1);
-      set_motor_direction(RIGHT_MOT, 1);
-      delay(500);
-      set_motor_direction(CLAW_MOT, 0);
-      Serial.println("block released");
-    }
-    drop = false;
   }
+
 }
+
+
 
 int stage_action(){
     // ADD for stage shifts, e.g. time based, encoder value based, ultrasonic sensor value based
@@ -506,7 +495,7 @@ int stage_action(){
         /* 
         case 60:: locating the right drop off location
             //red area distance from wall = 745
-            //green area distance from wall = 190  make variables for these!
+            //green area distance from wall = 190  make variables for these!  // these need to change!!
 
             if (red_block && distance_ultrasonic(echoPinFront) < 760) {
               Serial.println("in range for red stop");
@@ -537,14 +526,15 @@ int stage_action(){
             if(distance_ultrasonic(echoPinFront) < drop_distance) {
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
-              stage_start = true; // final stage drop it
+              stage_start = true; //  stage drop it
 
             
 
             }
         case 80:
           if (stage_start){
-            drop = true: // added this bool but probably a better way to do it check!! also adding a function for drop
+            drop = true; // added this bool but probably a better way to do it check!! also adding a function for drop
+            drop_block();
             stage_start = true;
           }
         case 90: // getting back on the line
@@ -599,18 +589,18 @@ int stage_action(){
               stage_start = true;
             }
           }
-          case 120: //final case we stop
-            if(stage_start){
-              stage_start = false;
-            }
-            
-            if (distance_ultrasonic(echoPinFront) > 100){
-              follow_line(170,145); // hopefully its straight by now
-            }
-            else{
-              set_motor_direction(LEFT_MOT, 0);
-              set_motor_direction(RIGHT_MOT, 0);
-            }  // we have stopped
+        case 120: //final case we stop
+          if(stage_start){
+            stage_start = false;
+          }
+          
+          if (distance_ultrasonic(echoPinFront) > 100){
+            follow_line(170,145); // hopefully its straight by now            
+          }
+          else{
+             set_motor_direction(LEFT_MOT, 0);
+             set_motor_direction(RIGHT_MOT, 0);
+          }  // we have stopped
 
   
         */
