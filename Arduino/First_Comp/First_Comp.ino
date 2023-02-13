@@ -21,8 +21,8 @@
 // GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
 #define delay_per_degree 12.9 // At X motor speed (NEED TO MEASURE) (DO NOT USE?)
 #define stagnation_time 500 // Time allowed for a line sensor to be continuously active || TEST
-#define tj_detection_interval 225 // Minimum time difference between consecutive detection of t-jucntions || TEST
-#define line_crossing_delay 125 // Minimum time delay that ensures that the line sensor goes through the line without getting activated || TEST
+#define tj_detection_interval 600 // Minimum time difference between consecutive detection of t-jucntions || TEST
+#define line_crossing_delay 600 // Minimum time delay that ensures that the line sensor goes through the line without getting activated || TEST
 #define wheel_dist 220 // Distance between the centers of the wheels, NEED TO MEASURE
 #define llrr 75 // Distance between left-most and right-most sensors, NEED TO VERIFY
 #define lr 25 // Distance between left and right sensors, NEED TO VERIFY
@@ -83,6 +83,7 @@ void tjCounter(){
     // Counter of T-junctions, with protection against excessive counting
     if (millis() - t_tjc > tj_detection_interval){tjc++; t_tjc = millis();}
     Serial.println("T junction encountered!"); // DEBUGGING
+    Serial.println(tjc); // DEBUGGING
 }
 
 bool sensorRead(int pin){
@@ -216,8 +217,8 @@ void rotate_ccw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
 
-    set_motor_direction(LEFT_MOT, -1);
-    set_motor_direction(RIGHT_MOT, 1);
+    set_motor_direction(LEFT_MOT, 1);
+    set_motor_direction(RIGHT_MOT, -1);
 }
 
 // TESTED
@@ -225,8 +226,8 @@ void rotate_cw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
 
-    set_motor_direction(LEFT_MOT, 1);
-    set_motor_direction(RIGHT_MOT, -1);
+    set_motor_direction(LEFT_MOT, -1);
+    set_motor_direction(RIGHT_MOT, 1);
 }
 
 // TESTED (EXCEPT STAGNATION!!!), WORKS FINE
@@ -315,8 +316,8 @@ int stage_action_first_comp(){
                 // Start going forward
                 Serial.print("Current Stage: "); // DEBUGGING
                 Serial.println(delivery_stage); // DEBUGGING
-                set_motor_speed(LEFT_MOT, 180); 
-                set_motor_speed(RIGHT_MOT, 180); 
+                set_motor_speed(LEFT_MOT, 200); 
+                set_motor_speed(RIGHT_MOT, 200); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 stage_start = false;
@@ -369,7 +370,7 @@ int stage_action_first_comp(){
                     set_motor_direction(RIGHT_MOT, 0);
                     // Start rotating
                     Serial.println("started rotating"); // DEBUGGING
-                    rotate_cw(145);
+                    rotate_cw(160);
                     delay(line_crossing_delay * 2); // THIS DELAY IS VERY IMPORTANT, IT HAS TO BE LONG ENOUGH TO MAKE SURE THE LEFT SENSOR IS ON THE LINE
                     rotating = true;
                     break;
@@ -391,8 +392,9 @@ int stage_action_first_comp(){
                 Serial.println(delivery_stage); // DEBUGGING
                 Serial.println("Start"); // DEBUGGING
                 t_stage_st = millis();
-                set_motor_speed(LEFT_MOT, 190); 
-                set_motor_speed(RIGHT_MOT, 190); 
+                Serial.println(t_stage_st);
+                set_motor_speed(LEFT_MOT, 200); 
+                set_motor_speed(RIGHT_MOT, 200); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 delay(line_crossing_delay); // to get off the initial line that connects start box to the main loop || TEST THE DELAY
@@ -406,10 +408,19 @@ int stage_action_first_comp(){
             //    stage_start=true;
             //    break;
             //}
-            
-            if (millis() - t_stage_st > 6000 && tjc == 3){delivery_stage = 3; stage_start = true; break;} // Move to the next stage
+            // Move to the next stage
             // Give the robot enough time to leave the starting zone, then ignore the drop-off junction 
-            if ((millis() - t_stage_st > 1500) && tjc != 3){if(rr_value == true){tjCounter(); delay(line_crossing_delay); break;}} // Avoid T-junction at the green drop-off || TEST
+            if ((millis() - t_stage_st > 1500) && tjc != 3){
+              if(rr_value == true){
+                Serial.println(millis()); 
+                tjCounter(); 
+                delay(line_crossing_delay); 
+                Serial.println("Drop-off tjc"); 
+                delivery_stage = 3; 
+                stage_start = true;
+                break;
+              }
+            } // Avoid T-junction at the green drop-off || TEST
             // tjc is equal to 3 after the drop-off junction has been passed
 
             follow_line(200, 200); // TEST THE SPEED
@@ -422,17 +433,19 @@ int stage_action_first_comp(){
                 stage_start = false;
                 t_stage_st = millis();
                 Serial.println("Start"); // DEBUGGINGx
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1);
+                delay(line_crossing_delay);
             }
 
-            if (millis() - t_stage_st > 7000){delivery_stage = 4; stage_start = true; break;}
+            if (millis() - t_stage_st > 5000){delivery_stage = 4; stage_start = true; break;}
 
             follow_line(254, 180);
             break;
         case 4: // Going through pick-up locations and thunnel
             if (stage_start){
-                // Some kind of wiggly motion to find the line?
-                set_motor_speed(LEFT_MOT, 190); 
-                set_motor_speed(RIGHT_MOT, 190); 
+                Serial.print("Current Stage: "); // DEBUGGING
+                Serial.println(delivery_stage); // DEBUGGINGset_motor_speed(LEFT_MOT, 190);  
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 t_stage_st = millis();
@@ -503,7 +516,12 @@ void loop() {
     if (r_value && !r_up){t_r = millis(); r_up = true;} 
     if (!l_value){l_up = false;}
     if (!r_value){r_up = false;}
+    //Serial.print(ll_value);
+    //Serial.print(l_value);
+    //Serial.print(r_value);
+    //Serial.println(rr_value);
+    //delay(200);
 
     stage_action_first_comp();
-    //follow_line(170, 145);
+    //follow_line(200, 145);
 }
