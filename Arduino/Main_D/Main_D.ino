@@ -21,7 +21,7 @@
 // GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
 #define delay_per_degree 13.6 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
 #define stagnation_time 500 // Time allowed for a line sensor to be continuously active || TEST
-#define tj_detection_interval 200 // Minimum time difference between consecutive detection of t-jucntions || TEST
+#define tj_detection_interval 600 // Minimum time difference between consecutive detection of t-jucntions || TEST
 #define line_crossing_delay 600 // Minimum time delay that ensures that the line sensor goes through the line without getting activated || TEST
 #define wheel_dist 220 // Distance between the centers of the wheels, NEED TO MEASURE
 #define llrr 75 // Distance between left-most and right-most sensors, NEED TO VERIFY
@@ -340,6 +340,7 @@ int stage_action(){
     switch (delivery_stage) {
         case 1: // Getting out of the drop-off/start box || TEST
             if (stage_start){
+                // Start going forward
                 Serial.print("Current Stage: "); // DEBUGGING
                 Serial.println(delivery_stage); // DEBUGGING
                 set_motor_speed(LEFT_MOT, 200); 
@@ -368,10 +369,11 @@ int stage_action(){
                     on_main_loop = true;
                     Serial.println("both on");
                 }
-                else if (ll_value){
+                // record which sensor reached the line first
+                else if (ll_value && ll_rr_up_flag == 0){
                     ll_rr_up_flag = -1;
                 }
-                else if (rr_value){
+                else if (rr_value && ll_rr_up_flag == 0){
                     ll_rr_up_flag = 1;
                 }
                 // if right-right sensor reached the line first, wait until the left sensor reaches and start rotating 
@@ -384,8 +386,6 @@ int stage_action(){
                     on_main_loop = true;
                     Serial.println("left first");
                     }
-                // record which sensor reached the line first
-                
                 break;
             }
                 
@@ -398,11 +398,11 @@ int stage_action(){
                     // Start rotating
                     Serial.println("started rotating"); // DEBUGGING
                     rotate_cw(160);
-                    delay( line_crossing_delay * 1.5); // THIS DELAY IS VERY IMPORTANT, IT HAS TO BE LONG ENOUGH TO MAKE SURE THE LEFT SENSOR IS ON THE LINE
+                    delay((int) line_crossing_delay*1.5); // THIS DELAY IS VERY IMPORTANT, IT HAS TO BE LONG ENOUGH TO MAKE SURE THE LEFT SENSOR IS ON THE LINE
                     rotating = true;
                     break;
                 }
-                else if((!ll_value && !l_value && !r_value && !rr_value) || ll_value){
+                else if((!ll_value && !l_value && !r_value && !rr_value) || (l_value)){ // <- IMPROVE THIS
                     // Stop and go to the next stage
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
@@ -428,6 +428,7 @@ int stage_action(){
                 stage_start = false;
             }
 
+
           
             
            // Give the robot enough time to leave the starting zone, then ignore the drop-off junction 
@@ -450,7 +451,7 @@ int stage_action(){
             break;
         case 3: // Going over the ramp
             if (stage_start){
-              // Start moving forward
+                // Start moving forward
                 Serial.print("Current Stage: "); // DEBUGGING
                 Serial.println(delivery_stage); // DEBUGGING
                 stage_start = false;
@@ -463,7 +464,7 @@ int stage_action(){
                 delay(line_crossing_delay);
             }
 
-            if (millis() - t_stage_st > 5000){delivery_stage = 4; stage_start = true; break;}
+            if (millis() - t_stage_st > 30000){delivery_stage = 4; stage_start = true; break;}
 
             follow_line(250, 180);
             break;
@@ -754,7 +755,7 @@ void loop() {
     //Serial.print(r_value);
     //Serial.print(rr_value);
     
-   
+    
     
     
     //Serial.println(delivery_stage);
