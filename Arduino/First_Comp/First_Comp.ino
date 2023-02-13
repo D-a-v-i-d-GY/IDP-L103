@@ -308,6 +308,7 @@ void drop_block() {
 
 }
 
+
 int stage_action_first_comp(){
     switch(delivery_stage){
     // ADD for stage shifts, e.g. time based, encoder value based, ultrasonic sensor value based
@@ -338,9 +339,16 @@ int stage_action_first_comp(){
             else if (!on_main_loop){
                 // orientation of the robot is acceptable, start rotating after a short delay
                 if (ll_value && rr_value){
-                    delay((int) line_crossing_delay / 3);
+                    delay((int) line_crossing_delay / 4);
                     on_main_loop = true;
                     Serial.println("both on");
+                }
+                // record which sensor reached the line first
+                else if (ll_value && ll_rr_up_flag == 0){
+                    ll_rr_up_flag = -1;
+                }
+                else if (rr_value && ll_rr_up_flag == 0){
+                    ll_rr_up_flag = 1;
                 }
                 // if right-right sensor reached the line first, wait until the left sensor reaches and start rotating 
                 else if (ll_rr_up_flag == 1 && l_value){
@@ -352,13 +360,6 @@ int stage_action_first_comp(){
                     on_main_loop = true;
                     Serial.println("left first");
                     }
-                // record which sensor reached the line first
-                else if (ll_value){
-                    ll_rr_up_flag = -1;
-                }
-                else if (rr_value){
-                    ll_rr_up_flag = 1;
-                }
                 break;
             }
                 
@@ -371,11 +372,11 @@ int stage_action_first_comp(){
                     // Start rotating
                     Serial.println("started rotating"); // DEBUGGING
                     rotate_cw(160);
-                    delay(line_crossing_delay * 2); // THIS DELAY IS VERY IMPORTANT, IT HAS TO BE LONG ENOUGH TO MAKE SURE THE LEFT SENSOR IS ON THE LINE
+                    delay((int) line_crossing_delay*1.5); // THIS DELAY IS VERY IMPORTANT, IT HAS TO BE LONG ENOUGH TO MAKE SURE THE LEFT SENSOR IS ON THE LINE
                     rotating = true;
                     break;
                 }
-                else if(!ll_value && !l_value && !r_value && !rr_value){ // <- IMPROVE THIS
+                else if((!ll_value && !l_value && !r_value && !rr_value) || (l_value)){ // <- IMPROVE THIS
                     // Stop and go to the next stage
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
@@ -409,6 +410,7 @@ int stage_action_first_comp(){
             //    break;
             //}
             // Move to the next stage
+            
             // Give the robot enough time to leave the starting zone, then ignore the drop-off junction 
             if ((millis() - t_stage_st > 1500) && tjc != 3){
               if(rr_value == true){
@@ -416,6 +418,8 @@ int stage_action_first_comp(){
                 tjCounter(); 
                 delay(line_crossing_delay); 
                 Serial.println("Drop-off tjc"); 
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1);
                 delivery_stage = 3; 
                 stage_start = true;
                 break;
@@ -433,6 +437,8 @@ int stage_action_first_comp(){
                 stage_start = false;
                 t_stage_st = millis();
                 Serial.println("Start"); // DEBUGGINGx
+                set_motor_speed(LEFT_MOT, 200); 
+                set_motor_speed(RIGHT_MOT, 200);                 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 delay(line_crossing_delay);
@@ -440,12 +446,14 @@ int stage_action_first_comp(){
 
             if (millis() - t_stage_st > 5000){delivery_stage = 4; stage_start = true; break;}
 
-            follow_line(254, 180);
+            follow_line(250, 180);
             break;
         case 4: // Going through pick-up locations and thunnel
             if (stage_start){
                 Serial.print("Current Stage: "); // DEBUGGING
-                Serial.println(delivery_stage); // DEBUGGINGset_motor_speed(LEFT_MOT, 190);  
+                Serial.println(delivery_stage); // DEBUGGING
+                set_motor_speed(LEFT_MOT, 200); 
+                set_motor_speed(RIGHT_MOT, 200); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 t_stage_st = millis();
@@ -456,10 +464,14 @@ int stage_action_first_comp(){
             if (tjc == 8){ // Arrived at the starting position
                 set_motor_direction(LEFT_MOT, 0);
                 set_motor_direction(RIGHT_MOT, 0);
-                delivery_stage = 5; stage_start = true; break;
+                delivery_stage = 5; delay(500); stage_start = true; break;
             }
             
-            if (rr_value || ll_value){tjCounter(); delay(line_crossing_delay); break;}
+            if (rr_value || ll_value){
+              tjCounter();
+              set_motor_direction(LEFT_MOT, 1);
+              set_motor_direction(RIGHT_MOT, 1); 
+              delay(500); break;}
             
             follow_line(200, 200);
 
@@ -467,22 +479,22 @@ int stage_action_first_comp(){
         case 5: // First pick-up location. Picking up the block and getting outside the pick-up zone
             if (stage_start){
                 // Some kind of wiggly motion to find the line?
+                Serial.print("Current Stage: "); // DEBUGGING
+                Serial.println(delivery_stage); // DEBUGGING
                 stage_start = false;
                 Serial.println("Start"); // DEBUGGING
                 rotate_cw(200);
-            }
-           
-            if(ll_value){
                 delay((int) line_crossing_delay * 2 / 3);
                 // Stop and go to the next stage
+                set_motor_speed(LEFT_MOT, 200); 
+                set_motor_speed(RIGHT_MOT, 200); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
-                delay(2700);
+                delay(3000);
                 set_motor_direction(LEFT_MOT, 0);
                 set_motor_direction(RIGHT_MOT, 0);
                 break;
             }
-            break;
     }
 }
 
@@ -523,5 +535,5 @@ void loop() {
     //delay(200);
 
     stage_action_first_comp();
-    //follow_line(200, 145);
+    //follow_line(200, 180);
 }

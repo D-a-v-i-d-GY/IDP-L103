@@ -17,7 +17,6 @@
 // MOTOR INDICIES
 #define LEFT_MOT 0 // Index of the left motor
 #define RIGHT_MOT 1 // Index of the right motor
-#define CLAW_MOT 2 // Index for claw motor
 
 // GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
 #define delay_per_degree 12.9 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
@@ -50,7 +49,6 @@ Servo grab_servo;  // attach servo to pin 9 in setup havent done yet not sure if
 // Useful flags
 int delivery_stage = 1; // Counter that determines the stage of the delivery process, robot's actions are determined by the stage number
 int tjc = 0; // T joint count (as seen from robot's perspective)
-int temp_counter = 0;
 bool stage_start = true; // Indicator for the start of a new stage
 bool rotating = false;
 bool reached_main_loop = false;
@@ -219,8 +217,8 @@ void rotate_ccw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
 
-    set_motor_direction(LEFT_MOT, -1);
-    set_motor_direction(RIGHT_MOT, 1);
+    set_motor_direction(LEFT_MOT, 1);
+    set_motor_direction(RIGHT_MOT, -1);
 }
 
 // TESTED
@@ -228,8 +226,8 @@ void rotate_cw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
 
-    set_motor_direction(LEFT_MOT, 1);
-    set_motor_direction(RIGHT_MOT, -1);
+    set_motor_direction(LEFT_MOT, -1);
+    set_motor_direction(RIGHT_MOT, 1);
 }
 
 // TESTED (EXCEPT STAGNATION!!!), WORKS FINE
@@ -320,8 +318,8 @@ int stage_action(){
                 // Start going forward
                 Serial.print("Current Stage: "); // DEBUGGING
                 Serial.println(delivery_stage); // DEBUGGING
-                set_motor_speed(LEFT_MOT, 140); 
-                set_motor_speed(RIGHT_MOT, 140); 
+                set_motor_speed(LEFT_MOT, 200); 
+                set_motor_speed(RIGHT_MOT, 200); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 stage_start = false;
@@ -342,9 +340,16 @@ int stage_action(){
             else if (!on_main_loop){
                 // orientation of the robot is acceptable, start rotating after a short delay
                 if (ll_value && rr_value){
-                    delay((int) line_crossing_delay / 3);
+                    delay((int) line_crossing_delay / 4);
                     on_main_loop = true;
                     Serial.println("both on");
+                }
+                // record which sensor reached the line first
+                else if (ll_value && ll_rr_up_flag == 0){
+                    ll_rr_up_flag = -1;
+                }
+                else if (rr_value && ll_rr_up_flag == 0){
+                    ll_rr_up_flag = 1;
                 }
                 // if right-right sensor reached the line first, wait until the left sensor reaches and start rotating 
                 else if (ll_rr_up_flag == 1 && l_value){
@@ -356,13 +361,6 @@ int stage_action(){
                     on_main_loop = true;
                     Serial.println("left first");
                     }
-                // record which sensor reached the line first
-                else if (ll_value){
-                    ll_rr_up_flag = -1;
-                }
-                else if (rr_value){
-                    ll_rr_up_flag = 1;
-                }
                 break;
             }
                 
@@ -374,12 +372,12 @@ int stage_action(){
                     set_motor_direction(RIGHT_MOT, 0);
                     // Start rotating
                     Serial.println("started rotating"); // DEBUGGING
-                    rotate_cw(145);
-                    delay(line_crossing_delay * 2); // THIS DELAY IS VERY IMPORTANT, IT HAS TO BE LONG ENOUGH TO MAKE SURE THE LEFT SENSOR IS ON THE LINE
+                    rotate_cw(160);
+                    delay(line_crossing_delay / 4); // THIS DELAY IS VERY IMPORTANT, IT HAS TO BE LONG ENOUGH TO MAKE SURE THE LEFT SENSOR IS ON THE LINE
                     rotating = true;
                     break;
                 }
-                else if((!ll_value && !l_value && !r_value && !rr_value) || (rr_value && ll_rr_up_flag == -1)){ // <- IMPROVE THIS
+                else if((!ll_value && !l_value && !r_value && !rr_value) || (l_value)){ // <- IMPROVE THIS
                     // Stop and go to the next stage
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
@@ -396,11 +394,11 @@ int stage_action(){
                 Serial.println(delivery_stage); // DEBUGGING
                 Serial.println("Start"); // DEBUGGING
                 t_stage_st = millis();
-                //set_motor_speed(LEFT_MOT, 170); 
-                //set_motor_speed(RIGHT_MOT, 170); 
-                //set_motor_direction(LEFT_MOT, 1);
-                //set_motor_direction(RIGHT_MOT, 1);
-                //delay(line_crossing_delay); // to get off the initial line that connects start box to the main loop || TEST THE DELAY
+                set_motor_speed(LEFT_MOT, 200); 
+                set_motor_speed(RIGHT_MOT, 200); 
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1);
+                delay(line_crossing_delay); // to get off the initial line that connects start box to the main loop || TEST THE DELAY
                 stage_start = false;
             }
 
@@ -413,10 +411,20 @@ int stage_action(){
             //}
             
             // Give the robot enough time to leave the starting zone, then ignore the drop-off junction 
-            if ((millis() - t_stage_st > 3000) && tjc != 3){if(ll_value == true){tjCounter(); delay(line_crossing_delay); break;}} // Avoid T-junction at the green drop-off || TEST
+            if ((millis() - t_stage_st > 1500) && tjc != 3){
+              if(rr_value == true){
+                Serial.println(millis()); 
+                tjCounter(); 
+                delay(line_crossing_delay); 
+                Serial.println("Drop-off tjc"); 
+                delivery_stage = 3; 
+                stage_start = true;
+                break;
+              }
+            } // Avoid T-junction at the green drop-off || TEST
             // tjc is equal to 3 after the drop-off junction has been passed
 
-            follow_line(170, 145); // TEST THE SPEED
+            follow_line(200, 180); // TEST THE SPEED
             break;
         case 3: // Going over the ramp
             if (stage_start){
@@ -424,39 +432,16 @@ int stage_action(){
                 Serial.print("Current Stage: "); // DEBUGGING
                 Serial.println(delivery_stage); // DEBUGGING
                 stage_start = false;
-                Serial.println("Start"); // DEBUGGING
-            }
-
-            follow_line(200, 155);
-        case 3: // Going through the tunnel
-            if (stage_start){
-                // Start moving forward
-                Serial.print("Current Stage: "); // DEBUGGING
-                Serial.println(delivery_stage); // DEBUGGING
-                set_motor_speed(LEFT_MOT, 170); 
-                set_motor_speed(RIGHT_MOT, 170); 
+                t_stage_st = millis();
+                Serial.println("Start"); // DEBUGGINGx
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
-                stage_start = false;
-                Serial.println("Start"); // DEBUGGING
-                tunnel_wall_distance = distance_ultrasonic(echoPinSide); // Record the distance from the tunnel at entry
+                delay(line_crossing_delay);
             }
-            float side_wall_dist = distance_ultrasonic(echoPinSide);
             
-            if (side_wall_dist > 150){ // TEST THE DISTANCE
-                // Ultrasonic sensor does not see the wall of the tunnel anymore, change the stage
-                Serial.println("Out of the tunnel"); // DEBUGGING
-                delivery_stage = 4;
-                stage_start=true;
-                break;
-            }
+            if (millis() - t_stage_st > 5000){delivery_stage = 4; stage_start = true; break;}
 
-            else{ // TEST THE DISTANCE
-                float x = tunnel_line_distance;
-                rotate_angle(pi/2 - x);
-            }
-            // Maybe add an additional check for the distance from the front wall
-            break;
+            follow_line(250, 180);
         case 4: // Locating the block and getting close to it
             if (stage_start){
                 // Some kind of wiggly motion to find the line?
@@ -528,6 +513,35 @@ int stage_action(){
         
             break;
         /* 
+        case 6: // Going through the tunnel
+            if (stage_start){
+                // Start moving forward
+                Serial.print("Current Stage: "); // DEBUGGING
+                Serial.println(delivery_stage); // DEBUGGING
+                set_motor_speed(LEFT_MOT, 170); 
+                set_motor_speed(RIGHT_MOT, 170); 
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1);
+                stage_start = false;
+                Serial.println("Start"); // DEBUGGING
+                tunnel_wall_distance = distance_ultrasonic(echoPinSide); // Record the distance from the tunnel at entry
+            }
+            float side_wall_dist = distance_ultrasonic(echoPinSide);
+            
+            if (side_wall_dist > 150){ // TEST THE DISTANCE
+                // Ultrasonic sensor does not see the wall of the tunnel anymore, change the stage
+                Serial.println("Out of the tunnel"); // DEBUGGING
+                delivery_stage = 4;
+                stage_start=true;
+                break;
+            }
+
+            else{ // TEST THE DISTANCE
+                float x = tunnel_line_distance;
+                rotate_angle(pi/2 - x);
+            }
+            // Maybe add an additional check for the distance from the front wall
+            break;
         case 60:: locating the right drop off location
             //green area distance from wall = 500
             //red area distance from wall = 1900  make variables for these!  // these need to change!!
