@@ -211,8 +211,8 @@ void rotate_ccw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
 
-    set_motor_direction(LEFT_MOT, -1);
-    set_motor_direction(RIGHT_MOT, 1);
+    set_motor_direction(LEFT_MOT, 1);
+    set_motor_direction(RIGHT_MOT, -1);
 }
 
 // NEEDS TEST
@@ -220,8 +220,8 @@ void rotate_cw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
 
-    set_motor_direction(LEFT_MOT, 1);
-    set_motor_direction(RIGHT_MOT, -1);
+    set_motor_direction(LEFT_MOT, -1);
+    set_motor_direction(RIGHT_MOT, 1);
 }
 
 // DONE? NEEDS A LOT OF TEST!!!
