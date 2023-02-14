@@ -309,7 +309,7 @@ void drop_block() {
 }
 
 
-int stage_action_first_comp(){
+void stage_action_first_comp(){
     switch(delivery_stage){
     // ADD for stage shifts, e.g. time based, encoder value based, ultrasonic sensor value based
         case 1: // Getting out of the drop-off/start box || TEST
@@ -323,7 +323,7 @@ int stage_action_first_comp(){
                 set_motor_direction(RIGHT_MOT, 1);
                 stage_start = false;
                 Serial.println("Start"); // DEBUGGING
-                }
+                }   
 
             // Record the t-junctions until the main loop is reached
             if (!reached_main_loop){
@@ -402,17 +402,8 @@ int stage_action_first_comp(){
                 stage_start = false;
             }
 
-            //if (distance_ultrasonic(echoPinSide) <= tunnel_line_distance){ // TEST THE DISTANCE
-            //    // Ultrasonic sensor sees the wall of the tunnel, change the stage
-            //    Serial.println("Reached the tunnel"); // DEBUGGING
-            //    delivery_stage = 3;
-            //    stage_start=true;
-            //    break;
-            //}
-            // Move to the next stage
-            
             // Give the robot enough time to leave the starting zone, then ignore the drop-off junction 
-            if ((millis() - t_stage_st > 1500) && tjc != 3){
+            if ((millis() - t_stage_st > 1500)){
               if(rr_value == true){
                 Serial.println(millis()); 
                 tjCounter(); 
@@ -484,7 +475,7 @@ int stage_action_first_comp(){
                 stage_start = false;
                 Serial.println("Start"); // DEBUGGING
                 rotate_cw(200);
-                delay((int) line_crossing_delay * 2 / 3);
+                delay((int) line_crossing_delay * 2);
                 // Stop and go to the next stage
                 set_motor_speed(LEFT_MOT, 200); 
                 set_motor_speed(RIGHT_MOT, 200); 
