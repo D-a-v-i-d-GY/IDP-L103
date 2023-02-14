@@ -9,9 +9,12 @@
 #define l_pin 12 // Left line sensor pin number
 #define r_pin 11 // Right line sensor pin number
 #define rr_pin 8 // Right-most line sensor pin number
-#define echoPinFront 7 // Echo Pin for the ultrasonic sensor in the front
+#define button_pin 7 // button_pin
 #define echoPinSide 6 // Echo Pin for the ultrasonic sensor on the side
 #define trigPin 5 // Trigger Pin for the ultrasonic sensor
+#define redBlockIdPin 4
+#define blueBlockIdPin 3
+#define colorReadPin A0
 
 // MOTOR INDICIES
 #define LEFT_MOT 0 // Index of the left motor
@@ -23,12 +26,13 @@
 #define stagnation_time 500 // Time allowed for a line sensor to be continuously active || TEST
 #define tj_detection_interval 800 // Minimum time difference between consecutive detection of t-jucntions || TEST
 #define line_crossing_delay 300 // Minimum time delay that ensures that the line sensor goes through the line without getting activated || TEST
+#define pi 3.141593
+
 #define wheel_dist 220 // Distance between the centers of the wheels, NEED TO MEASURE
 #define llrr 75 // Distance between left-most and right-most sensors, NEED TO VERIFY
 #define lr 25 // Distance between left and right sensors, NEED TO VERIFY
 #define line_width 19 // Width of the white line, NEED TO VERIFY
 #define pick_up_distance 60
-#define pi 3.141593
 #define red_area_d 745
 #define greed_area_d 190
 #define grab_angle 60
@@ -38,8 +42,8 @@
 
 // Create motor objects
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
-Adafruit_DCMotor* right_motor = AFMS.getMotor(1);
-Adafruit_DCMotor* left_motor = AFMS.getMotor(2);
+Adafruit_DCMotor* right_motor = AFMS.getMotor(4);
+Adafruit_DCMotor* left_motor = AFMS.getMotor(3);
 
 Adafruit_DCMotor* motors[] = {left_motor, right_motor}; // Make an array with the mototrs for convenient handling
 
@@ -48,6 +52,7 @@ Servo grab_servo;  // attach servo to pin 9 in setup havent done yet not sure if
 Servo lift_servo;  // attach servo to pin 9 in setup havent done yet not sure if thats how it works
 
 // Useful flags
+bool execute = false;
 int delivery_stage = 1; // Counter that determines the stage of the delivery process, robot's actions are determined by the stage number
 int tjc = 0; // T joint count (as seen from robot's perspective)
 int temp_counter = 0;
@@ -76,6 +81,7 @@ bool ll_value;
 bool l_value;
 bool r_value;
 bool rr_value;
+bool button_value;
 int ll_rr_up_flag = 0;
 bool l_up = false; // flag to check if left sensor is on 
 bool r_up = false; // flag to check if right sensor is on 
@@ -86,35 +92,32 @@ unsigned long t0 = 0;
 unsigned long t_stage_part = 0;
 unsigned long t_stage_st = 0;
 
+bool sensorRead(int pin){
+    bool reading;
+    int out = digitalRead(pin);
+    if (out == 0){reading = false;}
+    else{reading = true;}
+
+    return reading;
+}
+
+void identifyColor(int analog_reading){
+    if (analog_reading > 300){ // blue block
+        digitalWrite(blueBlockIdPin, HIGH);
+        green_block = true;
+    }
+    else{
+        digitalWrite(redBlockIdPin, HIGH); 
+        red_block = true;
+    }
+    delay(5000);
+}
+
 void tjCounter(){
     // Counter of T-junctions, with protection against excessive counting
     if (millis() - t_tjc > tj_detection_interval){tjc++; t_tjc = millis();}
     Serial.println("T junction encountered!"); // DEBUGGING
     Serial.println(tjc); // DEBUGGING
-}
-
-// TEST THIS!!!! (TRY NOT TO USE!!!)
-float velocity(int motor){
-    // Return velocity based on the speed of the motor
-    // CHECK THIS
-    return 106.4 * ((float) motor_speeds[motor] / (float) 255) * (float) motor_directions[motor];
-}
-
-// NEEDS TEST (TRY NOT TO USE!!!)
-void orientaion_change(){
-    if (t0 == 0){
-        t0 = millis();
-        return;
-    }
-    float dt = (millis() - t0) / 1000;
-    float omega = (velocity(RIGHT_MOT) - velocity(LEFT_MOT)) / wheel_dist;
-    orientation += omega * dt * (180 / pi);
-    if (orientation >= 360){
-      orientation -= 360;
-    }
-    if (orientation <= -360){
-      orientation += 360;
-    }
 }
 
 // TESTED A LITTLE, MORE TESTS
@@ -146,7 +149,7 @@ void set_motor_speed(int motor, int speed){
     if (motor == 1 || motor == 0){
         // Don't change the speed if it is the same 
         if (motor_speeds[motor] != speed){
-            motors[motor]->setSpeed(speed); motor_speeds[motor] = speed; motor_velocities[motor] = velocity(motor);
+            motors[motor]->setSpeed(speed); motor_speeds[motor] = speed;
         }
     }
     else{
@@ -177,7 +180,7 @@ void set_motor_direction(int motor, int direction){
             }
         }
 
-        motor_directions[motor] = direction; motor_velocities[motor] = velocity(motor);
+        motor_directions[motor] = direction;
     }
     else{
         Serial.println(motor); // For debugging
@@ -265,29 +268,7 @@ void follow_line(int forward_speed, int rotation_speed){
         rotate_cw(rotation_speed);
     }
 }
-void grab_block() {
-  if(grab == true) {
-    lift_servo.write(0);
-    delay(2000);
-    grab_servo.write(grab_angle);
-    delay(2000);
-    grab = false;
-    grabbed = true;
-  }
-}
 
-void lift_mech() {
-  lift_servo.write(lift_angle);
-}
-
-
-void drop_block() {
-  if(drop == true) {
-    grab_servo.write (0);
-    delay(1000);
-  }
-
-}
  void pick_up() {  // once in psootion pick up
     if(in_position == true) {
       set_motor_direction(LEFT_MOT, 1);
@@ -311,8 +292,6 @@ void drop_block() {
       delay(1000);
       set_motor_direction(LEFT_MOT, 0);
       set_motor_direction(RIGHT_MOT, 0);
-      grab = true;
-      grab_block();
       delay(2000);
       if(r_value == false && l_value == false){
         set_motor_direction(LEFT_MOT, -1);
@@ -325,12 +304,8 @@ void drop_block() {
       delay(500);
       rotate_angle(30);
       in_position = false; 
-
-
-         
    }
  }
-
 
 void stage_action(){
     // ADD for stage shifts, e.g. time based, encoder value based, ultrasonic sensor value based
@@ -341,11 +316,14 @@ void stage_action(){
                 Serial.print("Current Stage: "); // DEBUGGING
                 Serial.println(delivery_stage); // DEBUGGING
                 Serial.println("Start"); // DEBUGGING
+
                 set_motor_speed(LEFT_MOT, 200); 
                 set_motor_speed(RIGHT_MOT, 200); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
+
                 stage_start = false;
+                //lift_servo.write(-20); 
                 }
 
             // Record the t-junctions until the main loop is reached
@@ -415,26 +393,31 @@ void stage_action(){
                 Serial.print("Current Stage: "); // DEBUGGING
                 Serial.println(delivery_stage); // DEBUGGING
                 Serial.print("Start time: "); // DEBUGGING
+                
                 t_stage_st = millis();
                 Serial.println(t_stage_st);
+
                 set_motor_speed(LEFT_MOT, 200); 
                 set_motor_speed(RIGHT_MOT, 200); 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
+
                 delay(line_crossing_delay); // to get off the initial line that connects start box to the main loop || TEST THE DELAY
-                lift_mech();
+                
                 stage_start = false;
             }
 
            // Give the robot enough time to leave the starting zone, then ignore the drop-off junction 
             if ((millis() - t_stage_st > 1500)){ //&& tjc != 3 removed this to test
               if(rr_value == true){
+                Serial.println("Drop-off tjc");
                 Serial.println(millis()); 
+
                 tjCounter();
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 delay(line_crossing_delay); 
-                Serial.println("Drop-off tjc");
+                
                 delivery_stage = 3; 
                 stage_start = true;
                 break;
@@ -451,15 +434,18 @@ void stage_action(){
                 Serial.println(delivery_stage); // DEBUGGING
                 t_stage_st = millis();
                 Serial.print("Start time: "); // DEBUGGING
+
                 set_motor_speed(LEFT_MOT, 200); 
                 set_motor_speed(RIGHT_MOT, 200);                 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
+
                 delay(line_crossing_delay);
+
                 stage_start = false;
             }
 
-            if (millis() - t_stage_st > 5000){delivery_stage = 4; stage_start = true; break;}
+            if (millis() - t_stage_st > 5000){delivery_stage = 41; stage_start = true; break;}
 
             follow_line(250, 180);
             break;
@@ -470,26 +456,34 @@ void stage_action(){
                 Serial.println(delivery_stage); // DEBUGGING
                 t_stage_st = millis();
                 Serial.print("Start time: "); // DEBUGGING
+
                 set_motor_speed(LEFT_MOT, 200); 
                 set_motor_speed(RIGHT_MOT, 200);                 
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
+
                 stage_start = false;
+                //grab_servo.write(grab_angle / 3);
+                //lift_servo.write(lift_angle); 
             }
             
-            if (tjc == 6){
+            if (tjc == 6 && (millis() - t_stage_part < 500)){
                 if (distance_ultrasonic(echoPinSide) < 150){ // TEST THE DISTANCE AND CLEARANCE FROM OTHER OBJECTS
-                    Serial.println("Block located at the First location"); // DEBUGGING
+                    Serial.println("Block located at the Third location"); // DEBUGGING
                     // Block located
                     // Stop
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
-                    delivery_stage = 51; // block located at the second pick-up location
+                    delivery_stage = 53; // block located at the second pick-up location
                     stage_start=true;
                 }
                 break;
             }
             
+            if (tjc == 5 && (millis() - t_stage_part < line_crossing_delay)){
+                follow_line(200, 200); break;
+            }
+
             if (tjc == 4 && (millis() - t_stage_part < 500)){
                 if (distance_ultrasonic(echoPinSide) < 150){ // TEST THE DISTANCE AND CLEARANCE FROM OTHER OBJECTS
                     Serial.println("Block located at the First location"); // DEBUGGING
@@ -513,29 +507,163 @@ void stage_action(){
                 break;
             }
 
-            if (rr_value){
-                if (distance_ultrasonic(echoPinSide) < 150){ // TEST THE DISTANCE AND CLEARANCE FROM OTHER OBJECTS
-                    // Block located and the robot is at the right position
-                    // Stop
-                    set_motor_direction(LEFT_MOT, 0);
-                    set_motor_direction(RIGHT_MOT, 0);
-                    if (tjc == 4){delivery_stage = 51; Serial.println("Block located at the first location");} // DEBUGGING // block located at the first pick-up location
-                    else if (tjc == 6){delivery_stage = 53; Serial.println("Block located at the first location");} // DEBUGGING // block located at the third pick-up location
-                    stage_start=true;
-                    break;
-                }
-                else{
-                    // An empty junction is reached, wait untill the sensor goes off the line and continue.
-                    Serial.println("Skipping the junction");
-                    delay(line_crossing_delay);
-                    break;
-                }
-            }
-
             follow_line(200, 200);
 
             break;
-        case 51: // second pick-up location. Picking up the block and getting outside the pick-up zone
+        case 41: // Picking-up the central block and identifying it
+            if (stage_start){
+                Serial.print("Current Stage: "); // DEBUGGING
+                Serial.println(delivery_stage); // DEBUGGING
+                set_motor_speed(LEFT_MOT, 200); 
+                set_motor_speed(RIGHT_MOT, 200); 
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1);
+                t_stage_st = millis();
+                stage_start = false;
+                Serial.println("Start"); // DEBUGGING
+            }
+
+            if (tjc == 6){ // Arrived at the starting position
+                set_motor_direction(LEFT_MOT, 0);
+                set_motor_direction(RIGHT_MOT, 0);
+                delivery_stage = 50; stage_start = true; break;
+            }
+
+            if (tjc == 5){ // Arrived at the starting position
+                set_motor_direction(LEFT_MOT, 0);
+                set_motor_direction(RIGHT_MOT, 0);
+                identifyColor(analogRead(colorReadPin));
+            }
+            
+            if (rr_value || ll_value){
+                tjCounter();
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1); 
+                delay(500); break;
+            }
+            
+            follow_line(200, 200);
+            break;
+        case 50: // second pick-up location. Picking up the block and getting outside the pick-up zone
+            if (stage_start){
+                Serial.print("Current Stage: "); // DEBUGGING
+                Serial.println(delivery_stage); // DEBUGGING
+                t_stage_st = millis();
+                Serial.println("Start"); // DEBUGGING
+
+                set_motor_speed(LEFT_MOT, 200); 
+                set_motor_speed(RIGHT_MOT, 200); 
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1);
+
+                stage_start = false;
+            }
+
+            if (green_block){
+                if (tjc == 7){ // arrived at the green drop-off location
+                    set_motor_direction(LEFT_MOT, 0);
+                    set_motor_direction(RIGHT_MOT, 0);
+
+                    rotate_cw(180);
+                    delay(line_crossing_delay * 3);
+
+                    set_motor_direction(LEFT_MOT, 1);
+                    set_motor_direction(RIGHT_MOT, 1);
+                    delay(line_crossing_delay * 5);
+
+                    set_motor_direction(LEFT_MOT, -1);
+                    set_motor_direction(RIGHT_MOT, -1);
+                    delay(line_crossing_delay * 5);
+
+                    rotate_ccw(180);
+                    delay(line_crossing_delay * 3);
+
+                    set_motor_direction(LEFT_MOT, 1);
+                    set_motor_direction(RIGHT_MOT, 1);
+                    delay(line_crossing_delay);
+
+                    delivery_stage = 60; stage_start = true; break;
+                }
+            }
+
+            if (red_block){
+                if (tjc == 9){ // arrived at the green drop-off location
+                    set_motor_direction(LEFT_MOT, 0);
+                    set_motor_direction(RIGHT_MOT, 0);
+
+                    rotate_cw(180);
+                    delay(line_crossing_delay * 3);
+
+                    set_motor_direction(LEFT_MOT, 1);
+                    set_motor_direction(RIGHT_MOT, 1);
+                    delay(line_crossing_delay * 5);
+
+                    set_motor_direction(LEFT_MOT, -1);
+                    set_motor_direction(RIGHT_MOT, -1);
+                    delay(line_crossing_delay * 5);
+
+                    rotate_cw(180);
+                    delay(line_crossing_delay * 3);
+
+                    set_motor_direction(LEFT_MOT, 1);
+                    set_motor_direction(RIGHT_MOT, 1);
+                    delay(line_crossing_delay);
+
+                    delivery_stage = 60; stage_start = true; break;
+                }
+            }
+
+            if (rr_value || ll_value){  
+                tjCounter();
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1); 
+                delay(500); break;
+            }
+
+            follow_line(200, 200);
+            break;
+        case 60:
+            if (red_block){
+                if (tjc == 10){ // arrived at the green drop-off location
+                    set_motor_direction(LEFT_MOT, 0);
+                    set_motor_direction(RIGHT_MOT, 0);
+
+                    rotate_ccw(180);
+                    delay(line_crossing_delay * 3);
+
+                    set_motor_direction(LEFT_MOT, 1);
+                    set_motor_direction(RIGHT_MOT, 1);
+                    delay(line_crossing_delay * 5);
+                    break; 
+                }
+            }
+
+            if (green_block){
+                if (tjc == 8){ // arrived at the green drop-off location
+                    set_motor_direction(LEFT_MOT, 0);
+                    set_motor_direction(RIGHT_MOT, 0);
+
+                    rotate_cw(180);
+                    delay(line_crossing_delay * 3);
+
+                    set_motor_direction(LEFT_MOT, 1);
+                    set_motor_direction(RIGHT_MOT, 1);
+                    delay(line_crossing_delay * 5);
+                    break; 
+                }
+            }
+
+            if (rr_value || ll_value){  
+                tjCounter();
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1); 
+                delay(500); break;
+            }
+
+            follow_line(200, 200);
+            break;
+        
+        /*case 51: // second pick-up location. Picking up the block and getting outside the pick-up zone
             if (stage_start){
                 if(second == true) {
                   stage_start = false;
@@ -600,8 +728,11 @@ void stage_action(){
             if (millis() - t_stage_st < 7000) {
               stage_start = true;  // out of the tunnel?
             }
-            break;
-        * 
+            break;*/
+    }
+}
+
+        /*
         case 60: //locating the right drop off location
             if(stage_start) {
               stage_start = false;
@@ -716,9 +847,7 @@ void stage_action(){
              set_motor_direction(LEFT_MOT, 0);
              set_motor_direction(RIGHT_MOT, 0);
           }  // we have stopped
-    }
-}
-
+*/
 
 void setup() {
     // test(); // To make initial tests, like run the motors, claw etc.
@@ -729,44 +858,52 @@ void setup() {
     pinMode(l_pin, INPUT);
     pinMode(r_pin, INPUT);
     pinMode(rr_pin, INPUT);
-    pinMode(echoPinFront, INPUT);
     pinMode(echoPinSide, INPUT);
     pinMode(trigPin, OUTPUT);
+    pinMode(button_pin, INPUT);
+    pinMode(colorReadPin, INPUT);
+    pinMode(redBlockIdPin, OUTPUT);
+    pinMode(blueBlockIdPin, OUTPUT);
 
-    delay(3000);
-    set_motor_speed(LEFT_MOT, 250); 
-    set_motor_speed(RIGHT_MOT, 250); 
-    set_motor_direction(LEFT_MOT, 1);
-    set_motor_direction(RIGHT_MOT, 1);
-    //delay(3000);
-    //set_motor_direction(LEFT_MOT, 0);
-    //set_motor_direction(RIGHT_MOT, 0);
+    set_motor_direction(LEFT_MOT, 0);
+    set_motor_direction(RIGHT_MOT, 0);
 
-    grab_servo.attach (9);
-    lift_servo.attach (9);
+    grab_servo.attach(9, 0, 45);
+    lift_servo.attach(10, 0, 45);
+    
+    //grab_servo.write(0);
+    //lift_servo.write(0);
 }
 
 void loop() {
+    //grab_servo.write(40);
+    //lift_servo.write(40);
+    //delay(250);
   // MODIFY THIS CODE AFTER TESTS
-    ll_value = digitalRead(ll_pin);
-    l_value = digitalRead(l_pin);
-    r_value = digitalRead(r_pin);
-    rr_value = digitalRead(rr_pin);
+    ll_value = sensorRead(ll_pin);
+    l_value = sensorRead(l_pin);
+    r_value = sensorRead(r_pin);
+    rr_value = sensorRead(rr_pin);                
+    button_value = sensorRead(button_pin);
     if (l_value && !l_up){t_l = millis(); l_up = true;} 
     if (r_value && !r_up){t_r = millis(); r_up = true;} 
     if (!l_value){l_up = false;}
     if (!r_value){r_up = false;} 
+
+    if (button_value) {
+      if (!execute){
+        execute = true;
+        delay(1000);    
+      }
+      else {
+        execute = false;
+      }
+    }
+
+    if (execute){
+      stage_action();
+    }
     // test
     //follow_line(250, 145);
     //stage_action();
-    //Serial.print(ll_value);
-    //Serial.print(l_value);
-    //Serial.print(r_value);
-    //Serial.print(rr_value);
-    pick_up();
-    
-    
-    
-    //Serial.println(delivery_stage);
-} 
-
+}
