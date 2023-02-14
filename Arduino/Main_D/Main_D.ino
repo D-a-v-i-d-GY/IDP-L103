@@ -19,7 +19,7 @@
 #define CLAW_MOT 2 // Index for claw motor
 
 // GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
-#define delay_per_degree 13.6 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
+#define delay_per_degree 13.5 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
 #define stagnation_time 500 // Time allowed for a line sensor to be continuously active || TEST
 #define tj_detection_interval 600 // Minimum time difference between consecutive detection of t-jucntions || TEST
 #define line_crossing_delay 600 // Minimum time delay that ensures that the line sensor goes through the line without getting activated || TEST
@@ -32,6 +32,7 @@
 #define red_area_d 745
 #define greed_area_d 190
 #define grab_angle 60
+#define lift_angle 60
 #define drop_distance 60 // random guess gotta check tghis the distance we initiate drop sequence
 #define release_distance 30 // again gotta check when we drop it
 
@@ -44,6 +45,7 @@ Adafruit_DCMotor* motors[] = {left_motor, right_motor}; // Make an array with th
 
 
 Servo grab_servo;  // attach servo to pin 9 in setup havent done yet not sure if thats how it works
+Servo lift_servo;  // attach servo to pin 9 in setup havent done yet not sure if thats how it works
 
 // Useful flags
 int delivery_stage = 1; // Counter that determines the stage of the delivery process, robot's actions are determined by the stage number
@@ -63,7 +65,7 @@ bool first = false;
 bool second = false;
 bool third = false;
 bool grabbed = false;
-bool in_position = false;
+bool in_position = true;
 
 // Variable init
 int motor_speeds[] = {0, 0};
@@ -285,12 +287,19 @@ void follow_line(int forward_speed, int rotation_speed){
 
 void grab_block() {
   if(grab == true) {
-    grab_servo.write (grab_angle);
-    delay(1000);
+    lift_servo.write(0);
+    delay(2000);
+    grab_servo.write(grab_angle);
+    delay(2000);
     grab = false;
     grabbed = true;
   }
 }
+
+void lift_mech() {
+  lift_servo.write(lift_angle);
+}
+
 
 void drop_block() {
   if(drop == true) {
@@ -301,11 +310,19 @@ void drop_block() {
 }
  void pick_up() {  // once in psootion pick up
     if(in_position == true) {
-      rotate_angle(90);
-      delay(500);
       set_motor_direction(LEFT_MOT, 1);
       set_motor_direction(RIGHT_MOT, 1);
-      delay(1000);
+      delay(300);
+      set_motor_direction(LEFT_MOT, 0);
+      set_motor_direction(RIGHT_MOT, 0);
+      rotate_angle(90);
+      delay(2000);
+      set_motor_direction(LEFT_MOT, 1);
+      set_motor_direction(RIGHT_MOT, 1);
+      delay(2000);
+      set_motor_direction(LEFT_MOT, -1);
+      set_motor_direction(RIGHT_MOT, -1);
+      delay(400);
       set_motor_direction(LEFT_MOT, 0);
       set_motor_direction(RIGHT_MOT, 0);
       rotate_angle(180);
@@ -425,6 +442,7 @@ int stage_action(){
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 delay(line_crossing_delay); // to get off the initial line that connects start box to the main loop || TEST THE DELAY
+                lift_mech();
                 stage_start = false;
             }
 
@@ -432,14 +450,14 @@ int stage_action(){
           
             
            // Give the robot enough time to leave the starting zone, then ignore the drop-off junction 
-            if ((millis() - t_stage_st > 1500) && tjc != 3){
+            if ((millis() - t_stage_st > 1500)){ //&& tjc != 3 removed this to test
               if(rr_value == true){
                 Serial.println(millis()); 
-                tjCounter(); 
-                delay(line_crossing_delay); 
-                Serial.println("Drop-off tjc"); 
+                tjCounter();
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
+                delay(line_crossing_delay); 
+                Serial.println("Drop-off tjc"); 
                 delivery_stage = 3; 
                 stage_start = true;
                 break;
@@ -464,7 +482,7 @@ int stage_action(){
                 delay(line_crossing_delay);
             }
 
-            if (millis() - t_stage_st > 30000){delivery_stage = 4; stage_start = true; break;}
+            if (millis() - t_stage_st > 10000){delivery_stage = 4; stage_start = true; break;}
 
             follow_line(250, 180);
             break;
@@ -478,15 +496,15 @@ int stage_action(){
             
             if(distance_ultrasonic(echoPinSide) < 830) {
               first = true;
-              stage_start = true;
+              delivery_stage = 52;
             }
             else if(distance_ultrasonic(echoPinSide) < 1620) {
               third = true;
-              stage_start = true;
+              delivery_stage = 53;
             }
             else if (millis() - t_stage_st < 4000 )    {
               second = true;
-              stage_start = true;
+              delivery_stage = 51;
             }         
 
 
@@ -528,7 +546,7 @@ int stage_action(){
             break;
         case 51: // second pick-up location. Picking up the block and getting outside the pick-up zone
             if (stage_start){
-                if(second == true && grabbed == false) {
+                if(second == true) {
                   stage_start = false;
                   Serial.println("Start"); // DEBUGGING
                 }
@@ -547,7 +565,7 @@ int stage_action(){
             break;
         case 52: // first pick-up location.
             if (stage_start){
-                if(first == true && grabbed == false) {
+                if(first == true) {
                   stage_start = false;
                   Serial.println("Start"); // DEBUGGING
                 }
@@ -564,7 +582,7 @@ int stage_action(){
             break;
         case 53: // Third pick-up location.
             if (stage_start){
-                if(third == true && grabbed == false && tjc > 3) {
+                if(third == true) {
                   stage_start = false;
                   Serial.println("Start"); // DEBUGGING
                 }
@@ -735,6 +753,7 @@ void setup() {
     //set_motor_direction(RIGHT_MOT, 0);
 
     grab_servo.attach (9);
+    lift_servo.attach (9);
 }
 
 void loop() {
@@ -754,9 +773,10 @@ void loop() {
     //Serial.print(l_value);
     //Serial.print(r_value);
     //Serial.print(rr_value);
-    
+    //pick_up();
     
     
     
     //Serial.println(delivery_stage);
 } 
+
