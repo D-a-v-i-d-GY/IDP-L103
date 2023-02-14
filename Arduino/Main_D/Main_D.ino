@@ -610,20 +610,21 @@ int stage_action(){
               stage_start = true;  // out of the tunnel?
             }
             break;
-        /* 
-        case 60:: locating the right drop off location
-            //green area distance from wall = 500
-            //red area distance from wall = 1900  make variables for these!  // these need to change!!
+        * 
+        case 60: //locating the right drop off location
+            if(stage_start) {
+              stage_start = false;
+            }
+            follow_line(170,145);
 
-            if (red_block && distance_ultrasonic(echoPinFront) < 1900) {
-              Serial.println("in range for red stop");
+            if (red_block && tjc == 9) {
+              
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
-              //initiate droppin sequence turn left soon when ll_value = 1  !
+              //initiate droppin sequence 
               stage_start = true;
             }
-            if (green_block && distance_ultrasonic(echoPinFront) < 500) {
-              Serial.println("in range for green stop");
+            if (green_block && tjc == 7) {
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
               //initiate droppin sequence turn right soon when rr_value = 1  !
@@ -636,11 +637,11 @@ int stage_action(){
                 // Start turning right
                 rotate_cw(145);
                 delay(line_crossing_delay * 2);
-                
+                t_stage_st = millis();
                 stage_start = false;
             }
             follow_line(120,120);        
-            if(distance_ultrasonic(echoPinFront) < drop_distance) {
+            if(millis() - t_stage_st < 4000 ) {
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
               stage_start = true; //  stage drop it
@@ -677,10 +678,10 @@ int stage_action(){
           follow_line(170,145);
           if(ll_value == true || rr_value == true){
             if(red_block == true) {
-              rotate_ccw(145);
+              rotate_ccw(90);
             }
             if(blue_block == true) {
-              rotate_cw(145);
+              rotate_cw(90);
             }
             delay(500);
             stage_start = true; //hopefully facing the right way    
@@ -694,7 +695,7 @@ int stage_action(){
               follow_line(170,145);
             }
             else {
-              rotate_ccw(100);
+              rotate_ccw(90);
               delay(500);
               stage_start = true;
             }
@@ -704,7 +705,7 @@ int stage_action(){
               follow_line(170,145);
             }
             else {
-              rotate_cw(100);
+              rotate_cw(90);
               delay(500);
               stage_start = true;
             }
@@ -713,9 +714,10 @@ int stage_action(){
         case 120: //final case we stop
           if(stage_start){
             stage_start = false;
+            t_stage_st = millis()
           }
           
-          if (distance_ultrasonic(echoPinFront) > 100){
+          if (millis() - t_stage_st < 3000){
             follow_line(170,145); // hopefully its straight by now            
           }
           else{
@@ -768,12 +770,12 @@ void loop() {
     if (!r_value){r_up = false;} 
     // test
     //follow_line(250, 145);
-    stage_action();
+    //stage_action();
     //Serial.print(ll_value);
     //Serial.print(l_value);
     //Serial.print(r_value);
     //Serial.print(rr_value);
-    //pick_up();
+    pick_up();
     
     
     
