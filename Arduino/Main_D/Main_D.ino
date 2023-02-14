@@ -5,7 +5,6 @@
 
 // ALL LENGTHS ARE IN MM!!
 
-// PINS
 #define ll_pin 13 // Left-most line sensor pin number
 #define l_pin 12 // Left line sensor pin number
 #define r_pin 11 // Right line sensor pin number
@@ -17,9 +16,10 @@
 // MOTOR INDICIES
 #define LEFT_MOT 0 // Index of the left motor
 #define RIGHT_MOT 1 // Index of the right motor
+#define CLAW_MOT 2 // Index for claw motor
 
 // GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
-#define delay_per_degree 12.9 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
+#define delay_per_degree 13.5 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
 #define stagnation_time 500 // Time allowed for a line sensor to be continuously active || TEST
 #define tj_detection_interval 800 // Minimum time difference between consecutive detection of t-jucntions || TEST
 #define line_crossing_delay 300 // Minimum time delay that ensures that the line sensor goes through the line without getting activated || TEST
@@ -32,9 +32,9 @@
 #define red_area_d 745
 #define greed_area_d 190
 #define grab_angle 60
+#define lift_angle 60
 #define drop_distance 60 // random guess gotta check tghis the distance we initiate drop sequence
 #define release_distance 30 // again gotta check when we drop it
-#define tunnel_line_distance 100
 
 // Create motor objects
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -45,10 +45,12 @@ Adafruit_DCMotor* motors[] = {left_motor, right_motor}; // Make an array with th
 
 
 Servo grab_servo;  // attach servo to pin 9 in setup havent done yet not sure if thats how it works
+Servo lift_servo;  // attach servo to pin 9 in setup havent done yet not sure if thats how it works
 
 // Useful flags
 int delivery_stage = 1; // Counter that determines the stage of the delivery process, robot's actions are determined by the stage number
 int tjc = 0; // T joint count (as seen from robot's perspective)
+int temp_counter = 0;
 bool stage_start = true; // Indicator for the start of a new stage
 bool rotating = false;
 bool reached_main_loop = false;
@@ -59,13 +61,17 @@ bool red_block = false;
 bool green_block = false;
 bool drop = false;
 bool grab = false;
+bool first = false;
+bool second = false;
+bool third = false;
+bool grabbed = false;
+bool in_position = true;
 
 // Variable init
 int motor_speeds[] = {0, 0};
 int motor_directions[] = {0, 0};
 float motor_velocities[] = {0.0, 0.0};
 float orientation;
-float tunnel_wall_distance = 0;
 bool ll_value;
 bool l_value;
 bool r_value;
@@ -85,15 +91,6 @@ void tjCounter(){
     if (millis() - t_tjc > tj_detection_interval){tjc++; t_tjc = millis();}
     Serial.println("T junction encountered!"); // DEBUGGING
     Serial.println(tjc); // DEBUGGING
-}
-
-bool sensorRead(int pin){
-    bool reading;
-    int out = digitalRead(pin);
-    if (out == 0){reading = false;}
-    else{reading = true;}
-
-    return reading;
 }
 
 // TEST THIS!!!! (TRY NOT TO USE!!!)
@@ -120,7 +117,7 @@ void orientaion_change(){
     }
 }
 
-// TEST IF IT IS BETTER TO HAVE ONE ECHO PIN OR ONE TRIG PIN
+// TESTED A LITTLE, MORE TESTS
 float distance_ultrasonic (int pinNumber){
     unsigned long duration;
     float distance;
@@ -131,7 +128,6 @@ float distance_ultrasonic (int pinNumber){
     delayMicroseconds(10); // Triggers the sensor
     digitalWrite(trigPin, LOW);
     duration = pulseIn(pinNumber, HIGH); // Measure the duration of the pulse
-    Serial.println(digitalRead(pinNumber));
     distance = (duration / 2) / 2.905;
     if (distance >= 3900){distance=-99;}
     return distance;
@@ -189,7 +185,7 @@ void set_motor_direction(int motor, int direction){
     }
 }
 
-// NEEDS PRECISE TESTS
+// NEEDS TEST (TRY NOT TO USE!!!)
 void rotate_angle(float angle){
     // This function makes the robot rotate around the center of the wheel axis by the given angle, CCW is assumed positive
   
@@ -213,7 +209,7 @@ void rotate_angle(float angle){
     set_motor_direction(RIGHT_MOT, 0);
 }
 
-// TESTED
+// NEEDS TEST
 void rotate_ccw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
@@ -222,7 +218,7 @@ void rotate_ccw(int speed){
     set_motor_direction(RIGHT_MOT, -1);
 }
 
-// TESTED
+// NEEDS TEST
 void rotate_cw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
@@ -231,7 +227,7 @@ void rotate_cw(int speed){
     set_motor_direction(RIGHT_MOT, 1);
 }
 
-// TESTED (EXCEPT STAGNATION!!!), WORKS FINE
+// DONE? NEEDS A LOT OF TEST!!!
 void follow_line(int forward_speed, int rotation_speed){
     // Algorithm for following the line
 
@@ -271,23 +267,69 @@ void follow_line(int forward_speed, int rotation_speed){
 }
 void grab_block() {
   if(grab == true) {
-    grab == false;
+    lift_servo.write(0);
+    delay(2000);
     grab_servo.write(grab_angle);
-    delay(1000);
-    Serial.println("block grabbed");
+    delay(2000);
+    grab = false;
+    grabbed = true;
   }
 }
+
+void lift_mech() {
+  lift_servo.write(lift_angle);
+}
+
 
 void drop_block() {
   if(drop == true) {
-    drop == false;
-    grab_servo.write(0);
+    grab_servo.write (0);
     delay(1000);
-    Serial.println("block dropped");
   }
 
 }
+ void pick_up() {  // once in psootion pick up
+    if(in_position == true) {
+      set_motor_direction(LEFT_MOT, 1);
+      set_motor_direction(RIGHT_MOT, 1);
+      delay(300);
+      set_motor_direction(LEFT_MOT, 0);
+      set_motor_direction(RIGHT_MOT, 0);
+      rotate_angle(90);
+      delay(2000);
+      set_motor_direction(LEFT_MOT, 1);
+      set_motor_direction(RIGHT_MOT, 1);
+      delay(2000);
+      set_motor_direction(LEFT_MOT, -1);
+      set_motor_direction(RIGHT_MOT, -1);
+      delay(400);
+      set_motor_direction(LEFT_MOT, 0);
+      set_motor_direction(RIGHT_MOT, 0);
+      rotate_angle(180);
+      set_motor_direction(LEFT_MOT, 1);
+      set_motor_direction(RIGHT_MOT, 1);
+      delay(1000);
+      set_motor_direction(LEFT_MOT, 0);
+      set_motor_direction(RIGHT_MOT, 0);
+      grab = true;
+      grab_block();
+      delay(2000);
+      if(r_value == false && l_value == false){
+        set_motor_direction(LEFT_MOT, -1);
+        set_motor_direction(RIGHT_MOT, -1);
+      }
+      else { 
+        set_motor_direction(LEFT_MOT, 0);
+        set_motor_direction(RIGHT_MOT, 0);
+      }
+      delay(500);
+      rotate_angle(30);
+      in_position = false; 
 
+
+         
+   }
+ }
 
 
 void stage_action(){
@@ -353,7 +395,7 @@ void stage_action(){
                     // Start rotating
                     Serial.println("started rotating"); // DEBUGGING
                     rotate_cw(160);
-                    delay(line_crossing_delay / 4); // THIS DELAY IS VERY IMPORTANT, IT HAS TO BE LONG ENOUGH TO MAKE SURE THE LEFT SENSOR IS ON THE LINE
+                    delay((int) line_crossing_delay*1.5); // THIS DELAY IS VERY IMPORTANT, IT HAS TO BE LONG ENOUGH TO MAKE SURE THE LEFT SENSOR IS ON THE LINE
                     rotating = true;
                     break;
                 }
@@ -380,20 +422,21 @@ void stage_action(){
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
                 delay(line_crossing_delay); // to get off the initial line that connects start box to the main loop || TEST THE DELAY
+                lift_mech();
                 stage_start = false;
             }
 
-            // Give the robot enough time to leave the starting zone, then ignore the drop-off junction 
-            if ((millis() - t_stage_st > 1500)){
+           // Give the robot enough time to leave the starting zone, then ignore the drop-off junction 
+            if ((millis() - t_stage_st > 1500)){ //&& tjc != 3 removed this to test
               if(rr_value == true){
                 Serial.println(millis()); 
-                tjCounter(); 
-                Serial.println("Drop-off tjc"); 
+                tjCounter();
                 set_motor_direction(LEFT_MOT, 1);
                 set_motor_direction(RIGHT_MOT, 1);
+                delay(line_crossing_delay); 
+                Serial.println("Drop-off tjc");
                 delivery_stage = 3; 
                 stage_start = true;
-                delay(line_crossing_delay); 
                 break;
               }
             }  // Avoid T-junction at the green drop-off || TEST
@@ -415,11 +458,12 @@ void stage_action(){
                 delay(line_crossing_delay);
                 stage_start = false;
             }
-            
+
             if (millis() - t_stage_st > 5000){delivery_stage = 4; stage_start = true; break;}
 
             follow_line(250, 180);
-        case 4: // Locating the block and getting close to it
+            break;
+        case 4: // Locating the block 
             if (stage_start){
                 // Start moving forward
                 Serial.print("Current Stage: "); // DEBUGGING
@@ -491,76 +535,87 @@ void stage_action(){
             follow_line(200, 200);
 
             break;
-        case 51: // First pick-up location. Picking up the block and getting outside the pick-up zone
+        case 51: // second pick-up location. Picking up the block and getting outside the pick-up zone
             if (stage_start){
-                // Some kind of wiggly motion to find the line?
-                stage_start = false;
-                Serial.println("Start"); // DEBUGGING
-                rotate_cw(100);
+                if(second == true) {
+                  stage_start = false;
+                  Serial.println("Start"); // DEBUGGING
+                }
+                else {
+                  stage_start = true;
+                }                
             }
-           
-            if (distance_ultrasonic(echoPinFront) < 150){
-                set_motor_direction(LEFT_MOT, 0);
-                set_motor_direction(RIGHT_MOT, 0);
-            }
-
-            if (distance_ultrasonic(echoPinFront) > pick_up_distance){
-                set_motor_direction(LEFT_MOT, 0);
-                set_motor_direction(RIGHT_MOT, 0);
-            }
-            grab = true;
-            grab_block();
-
-            break;
-        case 52: // Second pick-up location. Picking up the block and getting outside the pick-up zone
-        
-            break;
-        case 53: // Third pick-up location. Picking up the block and getting outside the pick-up zone
-        
-            break;
-        /* 
-        case 6: // Going through the tunnel
-            if (stage_start){
-                // Start moving forward
-                Serial.print("Current Stage: "); // DEBUGGING
-                Serial.println(delivery_stage); // DEBUGGING
-                set_motor_speed(LEFT_MOT, 170); 
-                set_motor_speed(RIGHT_MOT, 170); 
-                set_motor_direction(LEFT_MOT, 1);
-                set_motor_direction(RIGHT_MOT, 1);
-                stage_start = false;
-                Serial.println("Start"); // DEBUGGING
-                tunnel_wall_distance = distance_ultrasonic(echoPinSide); // Record the distance from the tunnel at entry
-            }
-            float side_wall_dist = distance_ultrasonic(echoPinSide);
-            
-            if (side_wall_dist > 150){ // TEST THE DISTANCE
-                // Ultrasonic sensor does not see the wall of the tunnel anymore, change the stage
-                Serial.println("Out of the tunnel"); // DEBUGGING
-                delivery_stage = 4;
-                stage_start=true;
-                break;
-            }
-
-            else{ // TEST THE DISTANCE
-                float x = tunnel_line_distance;
-                rotate_angle(pi/2 - x);
-            }
-            // Maybe add an additional check for the distance from the front wall
-            break;
-        case 60:: locating the right drop off location
-            //green area distance from wall = 500
-            //red area distance from wall = 1900  make variables for these!  // these need to change!!
-
-            if (red_block && distance_ultrasonic(echoPinFront) < 1900) {
-              Serial.println("in range for red stop");
-              set_motor_direction(LEFT_MOT, 0);
-              set_motor_direction(RIGHT_MOT, 0);
-              //initiate droppin sequence turn left soon when ll_value = 1  !
+            follow_line(200,145);
+            if(tjc == 3) {
+              grab = true;
+              grab_block();
               stage_start = true;
             }
-            if (green_block && distance_ultrasonic(echoPinFront) < 500) {
-              Serial.println("in range for green stop");
+            follow_line(170,145);
+
+            break;
+        case 52: // first pick-up location.
+            if (stage_start){
+                if(first == true) {
+                  stage_start = false;
+                  Serial.println("Start"); // DEBUGGING
+                }
+                else {
+                  stage_start = true;
+                }                
+            }
+            if(distance_ultrasonic(echoPinSide) < 300) {
+              in_position = true;
+              pick_up();
+              stage_start = true;
+            }
+            follow_line(170, 150);
+            break;
+        case 53: // Third pick-up location.
+            if (stage_start){
+                if(third == true) {
+                  stage_start = false;
+                  Serial.println("Start"); // DEBUGGING
+                }
+                else {
+                  stage_start = true;
+                }                
+            }
+            if(distance_ultrasonic(echoPinSide) < 300) {
+              in_position = true;
+              pick_up();
+              stage_start = true;
+            }
+            follow_line(170, 150);
+            break;
+        case 54: // get through tunnel
+            if (stage_start){
+              stage_start = false; 
+              set_motor_speed(LEFT_MOT, 200); 
+              set_motor_speed(RIGHT_MOT, 200); 
+              set_motor_direction(LEFT_MOT, 1);
+              set_motor_direction(RIGHT_MOT, 1);
+              t_stage_st = millis();           
+            }
+            if (millis() - t_stage_st < 7000) {
+              stage_start = true;  // out of the tunnel?
+            }
+            break;
+        * 
+        case 60: //locating the right drop off location
+            if(stage_start) {
+              stage_start = false;
+            }
+            follow_line(170,145);
+
+            if (red_block && tjc == 9) {
+              
+              set_motor_direction(LEFT_MOT, 0);
+              set_motor_direction(RIGHT_MOT, 0);
+              //initiate droppin sequence 
+              stage_start = true;
+            }
+            if (green_block && tjc == 7) {
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
               //initiate droppin sequence turn right soon when rr_value = 1  !
@@ -573,11 +628,11 @@ void stage_action(){
                 // Start turning right
                 rotate_cw(145);
                 delay(line_crossing_delay * 2);
-                
+                t_stage_st = millis();
                 stage_start = false;
             }
             follow_line(120,120);        
-            if(distance_ultrasonic(echoPinFront) < drop_distance) {
+            if(millis() - t_stage_st < 4000 ) {
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
               stage_start = true; //  stage drop it
@@ -614,13 +669,14 @@ void stage_action(){
           follow_line(170,145);
           if(ll_value == true || rr_value == true){
             if(red_block == true) {
-              rotate_ccw(145);
+              rotate_ccw(90);
             }
             if(blue_block == true) {
-              rotate_cw(145);
+              rotate_cw(90);
             }
             delay(500);
-            stage_start = true; //hopefully facing the right way    
+            stage_start = true; //hopefully facing the right way 
+          }   
           break;
         case 110: // find the starting point   testtttt
           if(stage_start) {
@@ -631,7 +687,7 @@ void stage_action(){
               follow_line(170,145);
             }
             else {
-              rotate_ccw(100);
+              rotate_ccw(90);
               delay(500);
               stage_start = true;
             }
@@ -641,7 +697,7 @@ void stage_action(){
               follow_line(170,145);
             }
             else {
-              rotate_cw(100);
+              rotate_cw(90);
               delay(500);
               stage_start = true;
             }
@@ -650,22 +706,19 @@ void stage_action(){
         case 120: //final case we stop
           if(stage_start){
             stage_start = false;
+            t_stage_st = millis()
           }
           
-          if (distance_ultrasonic(echoPinFront) > 100){
+          if (millis() - t_stage_st < 3000){
             follow_line(170,145); // hopefully its straight by now            
           }
           else{
              set_motor_direction(LEFT_MOT, 0);
              set_motor_direction(RIGHT_MOT, 0);
           }  // we have stopped
-
-  
-        */
-      
-
     }
 }
+
 
 void setup() {
     // test(); // To make initial tests, like run the motors, claw etc.
@@ -681,28 +734,39 @@ void setup() {
     pinMode(trigPin, OUTPUT);
 
     delay(3000);
-    //set_motor_speed(LEFT_MOT, 170); 
-    //set_motor_speed(RIGHT_MOT, 170); 
-    //set_motor_direction(LEFT_MOT, -1);
-    //set_motor_direction(RIGHT_MOT, -1);
+    set_motor_speed(LEFT_MOT, 250); 
+    set_motor_speed(RIGHT_MOT, 250); 
+    set_motor_direction(LEFT_MOT, 1);
+    set_motor_direction(RIGHT_MOT, 1);
     //delay(3000);
-    set_motor_direction(LEFT_MOT, 0);
-    set_motor_direction(RIGHT_MOT, 0);
+    //set_motor_direction(LEFT_MOT, 0);
+    //set_motor_direction(RIGHT_MOT, 0);
 
     grab_servo.attach (9);
+    lift_servo.attach (9);
 }
 
 void loop() {
   // MODIFY THIS CODE AFTER TESTS
-    ll_value = sensorRead(ll_pin);
-    l_value = sensorRead(l_pin);
-    r_value = sensorRead(r_pin);
-    rr_value = sensorRead(rr_pin);
+    ll_value = digitalRead(ll_pin);
+    l_value = digitalRead(l_pin);
+    r_value = digitalRead(r_pin);
+    rr_value = digitalRead(rr_pin);
     if (l_value && !l_up){t_l = millis(); l_up = true;} 
     if (r_value && !r_up){t_r = millis(); r_up = true;} 
     if (!l_value){l_up = false;}
-    if (!r_value){r_up = false;}
-    //follow_line(170, 145);
+    if (!r_value){r_up = false;} 
+    // test
+    //follow_line(250, 145);
     //stage_action();
+    //Serial.print(ll_value);
+    //Serial.print(l_value);
+    //Serial.print(r_value);
+    //Serial.print(rr_value);
+    pick_up();
+    
+    
+    
     //Serial.println(delivery_stage);
 } 
+
