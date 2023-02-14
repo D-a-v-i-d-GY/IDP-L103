@@ -77,6 +77,7 @@ unsigned long t_l = 0; // to measure the up-time of the left sensor
 unsigned long t_r = 0; // to measure the up-time of the right sensor
 unsigned long t_tjc = 0;
 unsigned long t0 = 0;
+unsigned long t_stage_part = 0;
 unsigned long t_stage_st = 0;
 
 void tjCounter(){
@@ -420,26 +421,55 @@ void stage_action(){
             follow_line(250, 180);
         case 4: // Locating the block and getting close to it
             if (stage_start){
-                // Some kind of wiggly motion to find the line?
+                // Start moving forward
+                Serial.print("Current Stage: "); // DEBUGGING
+                Serial.println(delivery_stage); // DEBUGGING
+                t_stage_st = millis();
+                Serial.print("Start time: "); // DEBUGGING
+                set_motor_speed(LEFT_MOT, 200); 
+                set_motor_speed(RIGHT_MOT, 200);                 
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1);
                 stage_start = false;
-                Serial.println("Start"); // DEBUGGING
             }
             
-            if (tjc == 4){
-                if (distance_ultrasonic(echoPinFront) < 150){ // TEST THE DISTANCE AND CLEARANCE FROM OTHER OBJECTS
-                    Serial.println("Block located at the second location"); // DEBUGGING
+            if (tjc == 6){
+                if (distance_ultrasonic(echoPinSide) < 150){ // TEST THE DISTANCE AND CLEARANCE FROM OTHER OBJECTS
+                    Serial.println("Block located at the First location"); // DEBUGGING
                     // Block located
                     // Stop
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
-                    delivery_stage = 52; // block located at the second pick-up location
+                    delivery_stage = 51; // block located at the second pick-up location
                     stage_start=true;
-                    break;
                 }
+                break;
             }
-        
-            if (rr_value){
+            
+            if (tjc == 4 && (millis() - t_stage_part < 500)){
+                if (distance_ultrasonic(echoPinSide) < 150){ // TEST THE DISTANCE AND CLEARANCE FROM OTHER OBJECTS
+                    Serial.println("Block located at the First location"); // DEBUGGING
+                    // Block located
+                    // Stop
+                    set_motor_direction(LEFT_MOT, 0);
+                    set_motor_direction(RIGHT_MOT, 0);
+                    delivery_stage = 51; // block located at the second pick-up location
+                    stage_start=true;
+                }
+                break;
+            }
+
+            if (rr_value || ll_value){
+                t_stage_part = millis();
                 tjCounter();
+                set_motor_speed(LEFT_MOT, 60); 
+                set_motor_speed(RIGHT_MOT, 60); 
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1); 
+                break;
+            }
+
+            if (rr_value){
                 if (distance_ultrasonic(echoPinSide) < 150){ // TEST THE DISTANCE AND CLEARANCE FROM OTHER OBJECTS
                     // Block located and the robot is at the right position
                     // Stop
@@ -458,7 +488,7 @@ void stage_action(){
                 }
             }
 
-            follow_line(170, 145);
+            follow_line(200, 200);
 
             break;
         case 51: // First pick-up location. Picking up the block and getting outside the pick-up zone
