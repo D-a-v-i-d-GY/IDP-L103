@@ -22,7 +22,7 @@
 #define CLAW_MOT 2 // Index for claw motor
 
 // GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
-#define delay_per_degree 13.5 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
+#define delay_per_degree 13.05 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
 #define stagnation_time 500 // Time allowed for a line sensor to be continuously active || TEST
 #define tj_detection_interval 800 // Minimum time difference between consecutive detection of t-jucntions || TEST
 #define line_crossing_delay 300 // Minimum time delay that ensures that the line sensor goes through the line without getting activated || TEST
@@ -91,6 +91,7 @@ unsigned long t_tjc = 0;
 unsigned long t0 = 0;
 unsigned long t_stage_part = 0;
 unsigned long t_stage_st = 0;
+unsigned long t_button = 0;
 
 bool sensorRead(int pin){
     bool reading;
@@ -105,12 +106,17 @@ void identifyColor(int analog_reading){
     if (analog_reading > 300){ // blue block
         digitalWrite(blueBlockIdPin, HIGH);
         green_block = true;
+        red_block = false;
+        delay(5000);
+        digitalWrite(blueBlockIdPin, LOW);
     }
     else{
         digitalWrite(redBlockIdPin, HIGH); 
         red_block = true;
+        green_block = false;
+        delay(5000);
+        digitalWrite(redBlockIdPin, LOW);
     }
-    delay(5000);
 }
 
 void tjCounter(){
@@ -217,8 +223,8 @@ void rotate_ccw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
 
-    set_motor_direction(LEFT_MOT, 1);
-    set_motor_direction(RIGHT_MOT, -1);
+    set_motor_direction(LEFT_MOT, -1);
+    set_motor_direction(RIGHT_MOT,1);
 }
 
 // NEEDS TEST
@@ -226,8 +232,8 @@ void rotate_cw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
 
-    set_motor_direction(LEFT_MOT, -1);
-    set_motor_direction(RIGHT_MOT, 1);
+    set_motor_direction(LEFT_MOT, 1);
+    set_motor_direction(RIGHT_MOT, -1);
 }
 
 // DONE? NEEDS A LOT OF TEST!!!
@@ -521,6 +527,7 @@ void stage_action(){
                 t_stage_st = millis();
                 stage_start = false;
                 Serial.println("Start"); // DEBUGGING
+                tjc = 3;
             }
 
             if (tjc == 6){ // Arrived at the starting position
@@ -529,11 +536,17 @@ void stage_action(){
                 delivery_stage = 50; stage_start = true; break;
             }
 
-            if (tjc == 5){ // Arrived at the starting position
+            /*if (tjc == 5){ // Arrived at the starting position      
                 set_motor_direction(LEFT_MOT, 0);
                 set_motor_direction(RIGHT_MOT, 0);
-                identifyColor(analogRead(colorReadPin));
-            }
+                delay(500);
+                //identifyColor(analogRead(colorReadPin));
+                block_detected = true;
+                //delay(500);
+                set_motor_direction(LEFT_MOT, 1);
+                set_motor_direction(RIGHT_MOT, 1);  // added these not sure if necessary
+                break;
+            }*/
             
             if (rr_value || ll_value){
                 tjCounter();
@@ -544,7 +557,7 @@ void stage_action(){
             
             follow_line(200, 200);
             break;
-        case 50: // second pick-up location. Picking up the block and getting outside the pick-up zone
+        case 50: // out of the stright going in the tunnel and placing block
             if (stage_start){
                 Serial.print("Current Stage: "); // DEBUGGING
                 Serial.println(delivery_stage); // DEBUGGING
@@ -557,6 +570,18 @@ void stage_action(){
                 set_motor_direction(RIGHT_MOT, 1);
 
                 stage_start = false;
+                break;
+            }
+
+            if(millis() - t_stage_st > 8500 && !green_block && !red_block ) {
+              set_motor_direction(LEFT_MOT, 0);
+              set_motor_direction(RIGHT_MOT, 0);
+              delay(500);
+              identifyColor(analogRead(colorReadPin));
+              delay(500);
+              set_motor_direction(LEFT_MOT, 1);
+              set_motor_direction(RIGHT_MOT, 1);  // added these not sure if necessary
+              break;
             }
 
             if (green_block){
@@ -564,19 +589,19 @@ void stage_action(){
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
 
-                    rotate_cw(180);
-                    delay(line_crossing_delay * 3);
+                    rotate_angle(270);
+                    delay(1000);
 
                     set_motor_direction(LEFT_MOT, 1);
                     set_motor_direction(RIGHT_MOT, 1);
-                    delay(line_crossing_delay * 5);
+                    delay(line_crossing_delay * 7);   
 
                     set_motor_direction(LEFT_MOT, -1);
                     set_motor_direction(RIGHT_MOT, -1);
-                    delay(line_crossing_delay * 5);
+                    delay(line_crossing_delay * 7);
 
-                    rotate_ccw(180);
-                    delay(line_crossing_delay * 3);
+                    rotate_angle(90);
+                    delay(1000);
 
                     set_motor_direction(LEFT_MOT, 1);
                     set_motor_direction(RIGHT_MOT, 1);
@@ -591,19 +616,19 @@ void stage_action(){
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
 
-                    rotate_cw(180);
-                    delay(line_crossing_delay * 3);
+                    rotate_angle(270);
+                    delay(1000);
 
                     set_motor_direction(LEFT_MOT, 1);
                     set_motor_direction(RIGHT_MOT, 1);
-                    delay(line_crossing_delay * 5);
+                    delay(line_crossing_delay * 7);   
 
                     set_motor_direction(LEFT_MOT, -1);
                     set_motor_direction(RIGHT_MOT, -1);
-                    delay(line_crossing_delay * 5);
+                    delay(line_crossing_delay * 7);
 
-                    rotate_cw(180);
-                    delay(line_crossing_delay * 3);
+                    rotate_angle(-90);
+                    delay(1000);
 
                     set_motor_direction(LEFT_MOT, 1);
                     set_motor_direction(RIGHT_MOT, 1);
@@ -622,17 +647,21 @@ void stage_action(){
 
             follow_line(200, 200);
             break;
-        case 60:
+        case 60: // parking
             if (red_block){
                 if (tjc == 10){ // arrived at the green drop-off location
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
 
-                    rotate_ccw(180);
-                    delay(line_crossing_delay * 3);
+                    rotate_angle(90);
+                    delay(1000);
 
                     set_motor_direction(LEFT_MOT, 1);
                     set_motor_direction(RIGHT_MOT, 1);
+                    delay(line_crossing_delay * 15);
+
+                    set_motor_direction(LEFT_MOT, -1);
+                    set_motor_direction(RIGHT_MOT, -1);
                     delay(line_crossing_delay * 5);
                     break; 
                 }
@@ -643,11 +672,15 @@ void stage_action(){
                     set_motor_direction(LEFT_MOT, 0);
                     set_motor_direction(RIGHT_MOT, 0);
 
-                    rotate_cw(180);
-                    delay(line_crossing_delay * 3);
+                    rotate_angle(-90);
+                    delay(1000);
 
                     set_motor_direction(LEFT_MOT, 1);
                     set_motor_direction(RIGHT_MOT, 1);
+                    delay(line_crossing_delay * 15);
+
+                    set_motor_direction(LEFT_MOT, -1);
+                    set_motor_direction(RIGHT_MOT, -1);
                     delay(line_crossing_delay * 5);
                     break; 
                 }
@@ -867,12 +900,8 @@ void setup() {
 
     set_motor_direction(LEFT_MOT, 0);
     set_motor_direction(RIGHT_MOT, 0);
-
-    grab_servo.attach(9, 0, 45);
-    lift_servo.attach(10, 0, 45);
+    t_stage_st = millis();
     
-    //grab_servo.write(0);
-    //lift_servo.write(0);
 }
 
 void loop() {
@@ -891,6 +920,7 @@ void loop() {
     if (!r_value){r_up = false;} 
 
     if (button_value) {
+      delay(3000);
       if (!execute){
         execute = true;
         delay(1000);    
@@ -900,10 +930,17 @@ void loop() {
       }
     }
 
+    else if (millis() - t_stage_st > 5000){
+      if (!execute){
+        execute = true;
+        delay(1000);    
+      }
+      else {
+        execute = false;
+      }
+    }
+    
     if (execute){
       stage_action();
     }
-    // test
-    //follow_line(250, 145);
-    //stage_action();
 }
