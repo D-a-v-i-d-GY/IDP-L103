@@ -9,36 +9,36 @@
 #define l_pin 12 // Left line sensor pin number
 #define r_pin 11 // Right line sensor pin number
 #define rr_pin 8 // Right-most line sensor pin number
-#define button_pin 7 // button_pin
+#define button_pin 7 // button_pin for starting the robot
 #define echoPinSide 6 // Echo Pin for the ultrasonic sensor on the side
 #define trigPin 5 // Trigger Pin for the ultrasonic sensor
-#define redBlockIdPin 4
-#define blueBlockIdPin 3
+#define redBlockIdPin 4 // Pin for identified red block
+#define blueBlockIdPin 3  // Pin for identified blue block
 #define colorReadPin A0
 
 // MOTOR INDICIES
 #define LEFT_MOT 0 // Index of the left motor
 #define RIGHT_MOT 1 // Index of the right motor
-#define CLAW_MOT 2 // Index for claw motor
+// #define CLAW_MOT 2 // Index for claw motor 
 
 // GEOMETRICAL CHARACTERISTICS, ROBOT CHARACTERISTICS
-#define delay_per_degree 13.05 // At 150 motor speed (NEED TO MEASURE) (DO NOT USE?)
+#define delay_per_degree 13.05 // At 240 motor speed tested and works the delay per degree when rotating
 #define stagnation_time 500 // Time allowed for a line sensor to be continuously active || TEST
 #define tj_detection_interval 800 // Minimum time difference between consecutive detection of t-jucntions || TEST
 #define line_crossing_delay 300 // Minimum time delay that ensures that the line sensor goes through the line without getting activated || TEST
 #define pi 3.141593
 
-#define wheel_dist 220 // Distance between the centers of the wheels, NEED TO MEASURE
-#define llrr 75 // Distance between left-most and right-most sensors, NEED TO VERIFY
-#define lr 25 // Distance between left and right sensors, NEED TO VERIFY
-#define line_width 19 // Width of the white line, NEED TO VERIFY
-#define pick_up_distance 60
-#define red_area_d 745
-#define greed_area_d 190
-#define grab_angle 60
-#define lift_angle 60
-#define drop_distance 60 // random guess gotta check tghis the distance we initiate drop sequence
-#define release_distance 30 // again gotta check when we drop it
+#define wheel_dist 220 // Distance between the centers of the wheels
+#define llrr 75 // Distance between left-most and right-most sensors
+#define lr 25 // Distance between left and right sensors
+#define line_width 19 // Width of the white line
+#define pick_up_distance 60 // robot wasn't ready to use
+#define red_area_d 745 // robot wasn't ready to use
+#define greed_area_d 190 // robot wasn't ready to use
+#define grab_angle 60 // robot wasn't ready to use
+#define lift_angle 60 // robot wasn't ready to use
+#define drop_distance 60 // the distance we initiate drop sequence robot wasn't ready to use
+#define release_distance 30 // robot wasn't ready to use gotta check
 
 // Create motor objects
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -48,24 +48,24 @@ Adafruit_DCMotor* left_motor = AFMS.getMotor(3);
 Adafruit_DCMotor* motors[] = {left_motor, right_motor}; // Make an array with the mototrs for convenient handling
 
 
-Servo grab_servo;  // attach servo to pin 9 in setup havent done yet not sure if thats how it works
-Servo lift_servo;  // attach servo to pin 9 in setup havent done yet not sure if thats how it works
+Servo grab_servo;  // attach servo to pin 9 in setup havent done yet not sure if thats how it works  robot wasn't ready
+Servo lift_servo;  // attach servo to pin 10 in setup havent done yet not sure if thats how it works robot wasn't ready
 
 // Useful flags
 bool execute = false;
 int delivery_stage = 1; // Counter that determines the stage of the delivery process, robot's actions are determined by the stage number
 int tjc = 0; // T joint count (as seen from robot's perspective)
-int temp_counter = 0;
+int temp_counter = 0; 
 bool stage_start = true; // Indicator for the start of a new stage
-bool rotating = false;
-bool reached_main_loop = false;
-bool on_main_loop = false;
-bool block_picked_up = false;
+bool rotating = false; // bool for checking if the robot is rotating
+bool reached_main_loop = false; // in the first case checks if it has got out of the box and on the main loop
+bool on_main_loop = false; // same use
+bool block_picked_up = false; 
 bool block_detected = false;
 bool red_block = false;
 bool green_block = false;
-bool drop = false;
-bool grab = false;
+bool drop = false; // the following were meant to be bools for grabbing the block and dropping it but the robots mechanics wasn't ready for testing
+bool grab = false; 
 bool first = false;
 bool second = false;
 bool third = false;
@@ -77,22 +77,24 @@ int motor_speeds[] = {0, 0};
 int motor_directions[] = {0, 0};
 float motor_velocities[] = {0.0, 0.0};
 float orientation;
-bool ll_value;
+bool ll_value; // the following are values for line sensors
 bool l_value;
 bool r_value;
 bool rr_value;
-bool button_value;
-int ll_rr_up_flag = 0;
+bool button_value; // the value for the start button
+int ll_rr_up_flag = 0;  // flag to be used in the initial stage for turning right first
 bool l_up = false; // flag to check if left sensor is on 
 bool r_up = false; // flag to check if right sensor is on 
 unsigned long t_l = 0; // to measure the up-time of the left sensor
 unsigned long t_r = 0; // to measure the up-time of the right sensor
-unsigned long t_tjc = 0;
+unsigned long t_tjc = 0; // t junction counteer time
 unsigned long t0 = 0;
-unsigned long t_stage_part = 0;
+unsigned long t_stage_part = 0; // the following are for measuring time to add redundencys
 unsigned long t_stage_st = 0;
 unsigned long t_button = 0;
 
+
+// function for value reading of a pin
 bool sensorRead(int pin){
     bool reading;
     int out = digitalRead(pin);
@@ -102,6 +104,7 @@ bool sensorRead(int pin){
     return reading;
 }
 
+// colour identification  function called when required
 void identifyColor(int analog_reading){
     if (analog_reading > 300){ // blue block
         digitalWrite(blueBlockIdPin, HIGH);
@@ -119,6 +122,7 @@ void identifyColor(int analog_reading){
     }
 }
 
+// t junction counter helps the robot know its location
 void tjCounter(){
     // Counter of T-junctions, with protection against excessive counting
     if (millis() - t_tjc > tj_detection_interval){tjc++; t_tjc = millis();}
@@ -126,7 +130,7 @@ void tjCounter(){
     Serial.println(tjc); // DEBUGGING
 }
 
-// TESTED A LITTLE, MORE TESTS
+// function for ultrasonic sensor measurement robot wasn;t ready for exectution
 float distance_ultrasonic (int pinNumber){
     unsigned long duration;
     float distance;
@@ -194,7 +198,7 @@ void set_motor_direction(int motor, int direction){
     }
 }
 
-// NEEDS TEST (TRY NOT TO USE!!!)
+// TESTED rotates a given angle
 void rotate_angle(float angle){
     // This function makes the robot rotate around the center of the wheel axis by the given angle, CCW is assumed positive
   
@@ -218,7 +222,7 @@ void rotate_angle(float angle){
     set_motor_direction(RIGHT_MOT, 0);
 }
 
-// NEEDS TEST
+// TESTED rotates ccw
 void rotate_ccw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
@@ -227,7 +231,7 @@ void rotate_ccw(int speed){
     set_motor_direction(RIGHT_MOT,1);
 }
 
-// NEEDS TEST
+// TESTED rotattes cw
 void rotate_cw(int speed){
     set_motor_speed(LEFT_MOT, speed); 
     set_motor_speed(RIGHT_MOT, speed); 
@@ -236,7 +240,7 @@ void rotate_cw(int speed){
     set_motor_direction(RIGHT_MOT, -1);
 }
 
-// DONE? NEEDS A LOT OF TEST!!!
+// TESTED function for following line
 void follow_line(int forward_speed, int rotation_speed){
     // Algorithm for following the line
 
@@ -275,6 +279,7 @@ void follow_line(int forward_speed, int rotation_speed){
     }
 }
 
+// obsolete pick up function for picking up the 2nd and 3rd blocks robot wasn't ready for use
  void pick_up() {  // once in psootion pick up
     if(in_position == true) {
       set_motor_direction(LEFT_MOT, 1);
@@ -313,6 +318,7 @@ void follow_line(int forward_speed, int rotation_speed){
    }
  }
 
+// main function which takes the robot through stages
 void stage_action(){
     // ADD for stage shifts, e.g. time based, encoder value based, ultrasonic sensor value based
     switch (delivery_stage) {
@@ -455,7 +461,7 @@ void stage_action(){
 
             follow_line(250, 180);
             break;
-        case 4: // Locating the block 
+        case 4: // Locating the block skipped case as ultrasonic sensor wasn't ready for use
             if (stage_start){
                 // Start moving forward
                 Serial.print("Current Stage: "); // DEBUGGING
@@ -557,7 +563,7 @@ void stage_action(){
             
             follow_line(200, 200);
             break;
-        case 50: // out of the stright going in the tunnel and placing block
+        case 50: // out of the stright identfying the block after the turn going in the tunnel and placing block
             if (stage_start){
                 Serial.print("Current Stage: "); // DEBUGGING
                 Serial.println(delivery_stage); // DEBUGGING
@@ -696,7 +702,8 @@ void stage_action(){
             follow_line(200, 200);
             break;
         
-        /*case 51: // second pick-up location. Picking up the block and getting outside the pick-up zone
+        /* // obsolete cases which would have picked up multiple blocks not tested as robot wasn't ready
+        case 51: // second pick-up location. Picking up the block and getting outside the pick-up zone
             if (stage_start){
                 if(second == true) {
                   stage_start = false;
@@ -713,7 +720,6 @@ void stage_action(){
               stage_start = true;
             }
             follow_line(170,145);
-
             break;
         case 52: // first pick-up location.
             if (stage_start){
@@ -765,13 +771,14 @@ void stage_action(){
     }
 }
 
-        /*
+
+
+        /*  // obsolete cases which would have picked up multiple blocks not tested as robot wasn't ready
         case 60: //locating the right drop off location
             if(stage_start) {
               stage_start = false;
             }
             follow_line(170,145);
-
             if (red_block && tjc == 9) {
               
               set_motor_direction(LEFT_MOT, 0);
@@ -800,9 +807,7 @@ void stage_action(){
               set_motor_direction(LEFT_MOT, 0);
               set_motor_direction(RIGHT_MOT, 0);
               stage_start = true; //  stage drop it
-
             
-
             }
             break;
         case 80:
@@ -919,7 +924,7 @@ void loop() {
     if (!l_value){l_up = false;}
     if (!r_value){r_up = false;} 
 
-    if (button_value) {
+    if (button_value) {   // start the robot once button is pressed
       delay(3000);
       if (!execute){
         execute = true;
@@ -929,17 +934,6 @@ void loop() {
         execute = false;
       }
     }
-
-    else if (millis() - t_stage_st > 5000){
-      if (!execute){
-        execute = true;
-        delay(1000);    
-      }
-      else {
-        execute = false;
-      }
-    }
-    
     if (execute){
       stage_action();
     }
